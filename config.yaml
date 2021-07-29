@@ -1,4 +1,4 @@
-baseurl: "/"
+baseurl: "https://statsandotherstuff.netlify.app"
 title: "Statistics and other stuff in life's adventure"
 author: Yi LIU
 canonifyurls: yes
@@ -32,7 +32,7 @@ markup:
 menu:
   primary:
     - name: Home
-      url: /
+      url: https://statsandotherstuff.netlify.app/
       weight: 1
     - name: About
       url: /about/
