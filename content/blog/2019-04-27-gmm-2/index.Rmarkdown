@@ -1,0 +1,213 @@
+---
+title: 高斯混合模型 2
+author: Yi LIU
+date: '2019-04-27'
+slug: []
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+---
+
+# 简介
+在上一篇文章中，我们简单给出了高斯模型的定义，以及说明梯度上升方法并不是求解这个问题的参数的高效方法。在本篇文章里，我们给出一个高效的求解算法，EM算法，并给出一些背后的理论推导。
+
+# 算法细节
+对于高斯混合模型来说，我们要估计的参数有：
+
+* $\pi_k, k \in \{1, \dots, K\}$： 各高斯组分比例$\pi_k > 0, \sum_k \pi_k=1$
+* $\mu_k, k \in \{1, \dots, K\}$：各高斯组分均值
+* $\sigma_k^2, k \in \{1, \dots, K\}$：各高斯组分方差
+
+我们求解方法是最大似然估计（maximum (log-)likelihood estimation, MLE）。对数似然函数是
+$$ \ell(\theta|x) = \sum_{i=1}^n \log \left( \sum_k \pi_k \phi_k(x_i) \right)$$
+
+在前一篇文章里面我们已经简略提过，对于高斯混合模型求解，比较好的方法是Expectation Maximization（EM）算法。对于每个观察值$x_i$来说，我们并不知道它属于那个组分，为此，我们引入一个隐变量，组分指示器(indicator)$z_{ik}$。它的取值如下
+$$z_{ik} = \left\{\begin{split} &1,& \text{ if }x_i \in k\text{ th-comp} \\ &0, & \text{ otherwise} \end{split}\right.$$
+当我们能够观测到它的值的时候，我们有全数据似然函数
+$$L_{complete}(\theta| x, z)=\prod_i \prod_k (\pi_k \phi(x_i|\mu_k, \sigma_k^2))^{z_{ik}}$$
+相应的对数似然函数是
+$$\ell_{complete}(\theta| x, z)=\sum_i \sum_k z_{ik}\left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right)$$
+这时候参数估计非常简单。对于组分的均值和方差来说，就是简单的单高斯分布参数估计。对于组分比例来说，就是$\hat{\pi_k} = \sum_i z_{ik}/N$。
+
+但是实际情况是我们不知道$z_{ik}$的值，因此我们必须使用EM算法。EM算法大致步骤如下：
+
+1. 初始化参数$\pi_k = 1/K$, $\sigma_k^2 = \sum_i(x_i - \bar{x}_i)^2$
+2. 基于当前参数估计$\theta^{(t)}$迭代以下两步直至收敛：
+    a. E-step：计算在当前参数下隐变量$z_{ik}$的期望(expectation)，$E(z_{ik}|x, \theta^{(t)})=Pr(x_i \in k\text{-th comp}|\theta^{(t)}) := \gamma_{ik}$
+    b. M-step：最大化对数似然函数在给定隐变量期望下的参数，并更新。$\theta^{(t+1)} = \arg\max_\theta \ell_{complete}(\theta|x, z=E(z|x, \theta^{(t)}))$
+    
+对于高斯混合模型来说，下面给出参数更新具体计算步骤。计算隐变量期望的表达式如下：
+$$\begin{split}& \gamma_{ik} \\
+= & E(z_{ik}|x, \theta^{(t)})\\
+= & Pr(x_i \in k\text{-th comp}|\theta^{(t)}) \\ 
+= & Pr(z_{ik}=1|x_i, \theta^{(t)}) \\
+= & \frac{Pr(z_{ik}=1, x_i| \theta^{(t)})}{ Pr(x_i|\theta^{(t)})} \\
+= & \frac{Pr(z_{ik}=1|\theta^{(t)}) Pr(x_i|z_{ik=1}, \theta^{(t)})}{Pr(x_i|\theta^{(t)})} \\
+= & \frac{\pi_k^{(t)} \phi(x_i|\mu_k^{(t)}, (\sigma_k^2)^{(t)})}{\sum_l \pi_l^{(t)} \phi(x_i|\mu_l^{(t)}, (\sigma_l^2)^{(t)})}
+\end{split}$$
+
+对于更新参数，我们有
+$$\ell_{complete}(\theta|x, E(z|\theta^{(t)})) = \sum_i \sum_k \gamma_{ik} \left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right)$$
+对其中的参数求偏导并令其为零，并考虑约束条件$\sum_k \pi_k=1$可解得
+$$\pi_k^{(t+1)} = \frac{\sum_i \gamma_{ik}}{\sum_i\sum_l \gamma_{il}} = \frac{\sum_i \gamma_{ik}}{N}$$
+$$\mu_k^{(t+1)} = \frac{\sum_i \gamma_{ik} x_i}{\sum_i \gamma_{ik}}$$
+$$(\sigma_k^2)^{(t+1)} = \frac{\sum_i \gamma_{ik} (x_i-\mu_k^{(t+1)})^2}{\sum_i \gamma_{ik}}$$
+上面的式子要推广到高维空间也很直接，只要保证相应的矩阵和矢量形状正确，不难写出正确的更新步骤。
+
+# 算法实现
+下面我们用一维数据来实现高斯混合模型的EM算法。我们还是使用前一篇文章里的数据，真实的参数是$\pi_1=\pi_2=0.5$, $\mu_1=-2$, $\mu_2=2$, $\sigma^2_1=\sigma^2_2=1$
+```{r, fig.width=5}
+set.seed(1234)
+x <- c(rnorm(2000, -2), rnorm(2000, 2))
+hist(x, breaks=500,freq = FALSE)
+```
+
+对于初始化，我们采用一个十分简单的算法
+```{r}
+pi1 <- 0.5
+pi2 <- 0.5
+mu1 <- -0.5
+mu2 <- 0.5
+sd1 <- sd(x)
+sd2 <- sd(x)
+```
+
+下面我们定义E-step。因为高斯分布很容易得到接近0的概率分布，为了解决这个数值稳定性问题，我们采用log-sum trick。
+```{r}
+mat_x <- matrix(x, nrow=length(x), ncol=2)
+Estep <- function(param_list) {
+  
+  pi1 <- param_list$pi1
+  pi2 <- param_list$pi2
+  mu1 <- param_list$mu1
+  mu2 <- param_list$mu2
+  var1 <- param_list$var1
+  var2 <- param_list$var2
+  # compute aik
+  mu_vec <- c(mu1, mu2)
+  var_vec <- c(var1, var2)
+  pi_vec <- c(pi1, pi2)
+  aik <- t(mat_x) - mu_vec
+  aik <- -aik**2/(2*var_vec)
+  aik <- aik-0.5*log(var_vec)
+  aik <- aik + log(pi_vec)
+  aik <- t(aik)
+  aik <- aik - apply(aik, 1, max)
+  gammaik <- exp(aik)
+  gammaik <- gammaik / apply(gammaik, 1, sum)
+}
+```
+```{r test-Estep, eval=FALSE, echo=FALSE}
+x <- c(1,-2)
+gamma_real <- matrix(
+  c(pi1*dnorm(x[1], mu1, sd1),
+    pi1*dnorm(x[2], mu1, sd1),
+    pi2*dnorm(x[1], mu2, sd2),
+    pi2*dnorm(x[2], mu2, sd2)),
+  ncol=2, nrow=2
+)
+gamma_real <- gamma_real / apply(gamma_real, 1, sum)
+
+mat_x <- matrix(x, nrow=2, ncol=2)
+gamma_fun <- Estep(x, pi1, pi2, mu1, mu2, sd1**2, sd2**2)
+```
+
+我们现在可以定义M-step
+```{r}
+Mstep <- function(gammaik) {
+  nc <- colSums(gammaik)
+  pis <- nc / N
+  pi1 <- pis[1]
+  pi2 <- pis[2]
+  
+  mus <- colSums(gammaik*mat_x) / nc
+  mu1 <- mus[1]
+  mu2 <- mus[2]
+  
+  vars <- colSums((t(t(mat_x) - mus))**2 * gammaik) / nc
+  var1 <- vars[1]
+  var2 <- vars[2]
+  
+  return(list(pi1=pi1, pi2=pi2, mu1=mu1, mu2=mu2, var1=var1,var2=var2))
+}
+```
+
+有了这两个函数，我们开始估计模拟数据的参数了
+```{r}
+N <- length(x)
+param_list <- list(
+  pi1=pi1, pi2=pi2,
+  mu1=mu1, mu2=mu2,
+  var1=sd1**2, var2=sd2**2)
+for (i in 1:100) {
+  gammaik <- Estep(param_list=param_list)
+  param_list <- Mstep(gammaik)
+}
+param_list
+```
+从这里我们可以看出，对于参数的估计比较准确。高斯混合模型还可以给出每个数据属于各个组分的概率$Pr(z_{ik}=1|x,\theta)$，我们可以用这个来对数据进行聚类。
+```{r, message=FALSE, echo=FALSE}
+library(tidyverse)
+label <- apply(gammaik, 1, which.max)
+data_df <- tibble(
+  x=x,
+  label=factor(label),
+  ind=1:length(x)
+)
+data_df %>% ggplot(
+  aes(x=ind, y=x, color=label)
+) + geom_point(alpha=0.5)
+```
+
+# 为什么上面的算法是正确的
+下面我们要论证为什么上面算法是正确的。需要证明的主要内容就是在每次迭代更新中，对数似然函数是增加的，也就是
+$$ \ell(\theta^{(t+1)}|x) \geq \ell(\theta^{(t)}|x)$$
+而对数似然函数就是取得观察值的概率的对数，因此我们需要证明
+$$\log Pr(x|\theta^{(t+1)}) \geq \log Pr(x|\theta^{(t)})$$
+
+我们先看不等式左边这一项。因为它是一个和隐变量$z$无关的函数，那么它在关于$z$的任意概率分布的均值都是它本身。取这个概率分布为$Pr(z|x, \theta^{(t)})$我们有
+$$\log  Pr(x|\theta^{(t+1)}) = \underbrace{\left(\sum_z Pr(z|x, \theta^{(t)})\right)}_{=1} \log  Pr(x|\theta^{(t+1)})\log  Pr(x|\theta^{(t+1)})$$
+而利用贝叶斯定理，我们有
+$$\log  Pr(x|\theta^{(t+1)}) = \log Pr(x, z|\theta^{(t+1)}) - \log Pr(z|x, \theta^{(t+1)})$$
+带入上式得
+$$\log  Pr(x|\theta^{(t+1)}) = \sum_z Pr(z|x, \theta^{(t)}) \log Pr(x, z|\theta^{(t+1)}) -\sum_z Pr(z|x, \theta^{(t)})\log Pr(z|x, \theta^{(t+1)})$$
+
+对于不等式右边，我们同样有
+$$\log  Pr(x|\theta^{(t)}) = \sum_z Pr(z|x, \theta^{(t)}) \log Pr(x, z|\theta^{(t)}) -\sum_z Pr(z|x, \theta^{(t)})\log Pr(z|x, \theta^{(t)})$$
+
+两式相减得到
+$$\begin{split}
+& \log Pr(x|\theta^{(t+1)}) - \log Pr(x|\theta^{(t)}) \\
+=& \sum_z Pr(z|x, \theta^{(t)}) \log Pr(x, z|\theta^{(t+1)}) - \sum_z Pr(z|x, \theta^{(t)}) Pr(x, z|\theta^{(t)}) \\
+ & - \sum_z Pr(z|x, \theta^{(t)}) \log \frac{Pr(z|x, \theta^{(t+1)})}{Pr(z|x, \theta^{(t)})}
+\end{split}$$
+等式最后一行是KL-divergence，始终为正
+$$- \sum_z Pr(z|x, \theta^{(t)}) \log \frac{Pr(z|x, \theta^{(t+1)})}{Pr(z|x, \theta^{(t)})} = KL(Pr(z|x, \theta^{(t)}) || Pr(z|x, \theta^{(t+1)})) \geq 0$$
+等式右边第一项可以写成
+$$\begin{split}
+& \sum_z Pr(z|x, \theta^{(t)}) \log Pr(x, z|\theta^{(t+1)}) \\
+= & \sum_z Pr(z|x, \theta^{(t)}) \sum_i \sum_k z_{ik} \left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \\
+= & \sum_i \sum_k \left(\sum_z Pr(z|x, \theta^{(t)}) z_{ik} \right) \left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \\
+= & \sum_i \sum_k \gamma_{ik} \left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \\
+= & \ell_{complete}(\theta^{(t+1)}|x, E(z|\theta^{(t)}))
+\end{split}$$
+对于第二项也可以进行相同处理，因此我们有
+$$\begin{split}
+& \log Pr(x|\theta^{(t+1)}) - \log Pr(x|\theta^{(t)}) \\
+= & \ell_{complete}(\theta^{(t+1)}|x, E(z|\theta^{(t)})) - \ell_{complete}(\theta^{(t)}|x, E(z|\theta^{(t)})) \\
+  & + KL(Pr(z|x, \theta^{(t)}) || Pr(z|x, \theta^{(t+1)})) \\
+\geq & \ell_{complete}(\theta^{(t+1)}|x, E(z|\theta^{(t)})) - \ell_{complete}(\theta^{(t)}|x, E(z|\theta^{(t)}))
+\end{split}$$
+但是在M-step中，我们更新参数使用到
+$$\theta^{(t+1)} = \arg\max_\theta \ell_{complete}(\theta|x, z=E(z|x, \theta^{(t)}))$$
+因此
+$$\ell_{complete}(\theta^{(t+1)}|x, E(z|\theta^{(t)})) \geq \ell_{complete}(\theta^{(t)}|x, E(z|\theta^{(t)}))$$
+所以我们最终证明了
+$$\ell(\theta^{(t+1)}|x) \geq \ell(\theta^{(t)}|x)$$
+
+# 小结
+在本篇文章里，我们利用一维数据介绍了高斯混合模型的一种常用求解方法：EM算法，用代码展示了具体的计算步骤，也证明了为什么EM算法可行。
+
+由于本文是介绍算法目的，代码更注重的是可读性，对于质量并没有过多追求。因此有很多可以改进的地方，比如说在`Estep`和`Mstep`两个函数中都使用了全局变量，也没有收敛性的检查。在实际生产代码中，这些都是需要改进的地方。
