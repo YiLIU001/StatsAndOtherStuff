@@ -8,6 +8,10 @@ categories:
 tags:
   - Bayesian
   - Stats
+output:
+  blogdown::html_page:
+    keepmd: true
+    toc: true
 ---
 
 # 简介
