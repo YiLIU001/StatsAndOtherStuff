@@ -1,0 +1,140 @@
+---
+title: Monte Carlo方法1
+author: Yi LIU
+date: '2019-11-13'
+slug: monte-carlo-1
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+---
+
+
+# 简介(Introduction)
+
+在之前的文章里，我们介绍了贝叶斯视角下的高斯混合模型。对于这个问题的求解，我们使用了Monte Carlo方法和变分推断方法。在本篇文章里，我们介绍一下Monte Carlo方法这一在贝叶斯模型中经常用到的近似后验概率(posterior probability)的方法。
+
+Monte Carlo方法的主要思想是，对于一个很难给出解析解的概率$p(\theta)$（在贝叶斯模型中通常是后验概率$p(\theta|data)$），我们使用用近似的方法从这个概率中采样，当采样的数量足够大的时候，我们就可以近似这个概率分布，从而计算它的相关统计量。具体来说，一个概率$p(\theta)$的统计量往往是由一个积分定义的
+$$E_p(h(\theta)) = \int_\mathcal{\Theta} h(\theta) p(\theta) d\theta$$
+其中$h(\theta)$是一个和这个统计量相关的函数。比如，如果我们想要知道$\theta$的均值，那么需要计算
+$$E_p(\theta) = \int_\mathcal{\Theta} \theta p(\theta) d\theta$$
+这里的$h(\theta)$就是$\theta$本身。如果$p(\theta)$是没有归一化的话，那么我们就需要
+$$E_p(h(\theta)) = \frac{\int_\Theta h(\theta) p(\theta)}{\int_\Theta p(\theta)} d\theta$$
+
+实际问题中，由于概率分布$p(\theta)$很难给出解析表达式，上述积分也很难直接求解。因此，我们需要使用一些近似方法。如果使用直接的数值积分，被积分函数$h(\theta) p(\theta)$的积分，那么可能效率会比较低，因为我们没有充分利用$p(\theta)$是个概率分布这一信息。一个效率更高的方法是我们生成一系列的随机变量$\{\theta_1, \dots, \theta_N\}$使得
+$$\frac{1}{N} \sum_{i=1}^N h(\theta_i) \rightarrow \int_\mathcal{\Theta} h(\theta) p(\theta) d\theta$$
+
+
+那么现在的问题就是如何高效地生成这一系列随机变量$\{\theta_1, \dots, \theta_N\}$使得上面的经验积分收敛的更快。如果我们能够直接从$p(\theta)$采样，那么计算方法就很直接了。但是实际问题里，由于$p(\theta)$往往很复杂,我们无法直接采样，就需要使用一些别的方法。
+
+下面我们介绍几个常用的方法。秉承我们之前一系列文章的宗旨，本文并不追求理论上的严格和完备，只是介绍一个大致的框架以及展示一些简单直接的代码实现。此外，本文也并不求全，不会奢求能够把所有重要方法都介绍到。
+
+# Importance sampling
+如果我们手头有一个分布$q(\theta)$很好采样的话，那么我们能不能利用它来近似上面的计算呢？这个想法就是importance sampling的基本思路。
+
+我们注意到
+$$\int_\mathcal{\Theta} h(\theta) p(\theta) d\theta = \int_\mathcal{\Theta} h(\theta) p(\theta) \frac{q(\theta)}{q(\theta)} d\theta = \int_\mathcal{\Theta} h(\theta)  \frac{p(\theta)}{q(\theta)} q(\theta) d\theta = E_q(h(\theta)\frac{p(\theta)}{q(\theta)})$$
+因此，如果我们能够很容易的从$q(\theta)$生成随机变量$\theta$，即
+$$\theta_i \overset{\text{i.i.d.}}{\sim} q(\theta) \text{, } i=1,\dots, N$$
+那么，我们可以利用
+$$\frac{1}{N} \sum_{i=1}^N h(\theta_i) \underbrace{\frac{p(\theta_i)}{q(\theta_i)}}_{w(\theta_i)(=w_i)}$$
+
+以高斯分布为例，我们的目标分布是一个二维分布$\theta \sim \mathcal{N} (\vec{\mu}, \Sigma)$。其中
+$$\vec{\mu} = \begin{pmatrix}0\\0 \end{pmatrix}$$
+$$\Sigma = \begin{pmatrix} 1 & 0.5 \\ 0.5 & 1 \end{pmatrix}$$
+那么我们选取的分布$q(\theta) = \mathcal{N}(\vec{\mu}_1, \Sigma_1)$。其中
+$$\vec{\mu}_1 = \begin{pmatrix}0.5\\0.5 \end{pmatrix}$$
+$$\Sigma_1 = \begin{pmatrix} 1 & 0.7 \\ 0.7 & 1 \end{pmatrix}$$
+
+我们考虑计算的统计量是均值。那么我们有
+$$h(\theta_i) = \theta_i$$
+$$\frac{p(\theta_i)}{q(\theta_i)} = \sqrt{\frac{det \Sigma_1}{det \Sigma}} \exp \left\{ -\frac{1}{2} (\theta_i - \mu)^T \Sigma^{-1} (\theta_i - \mu) + \frac{1}{2} (\theta_i - \mu_1)^T \Sigma_1^{-1} (\theta_i - \mu_1) \right\}$$
+
+下面我们先来实现代码
+```{r importance sampling, message=FALSE}
+set.seed(12345)
+library(mvtnorm)
+suppressWarnings(library(tidyverse))
+mu <- c(0,0)
+mu1 <- c(0.5, 0.5)
+Sigma <- matrix(c(1,0.5, 0.5, 1), ncol=2)
+Sigma1 <- matrix(c(1,0.7, 0.7, 1), ncol=2)
+
+cal_prob_ratio <- function(theta, mu, mu1, Sigma, Sigma1) {
+  prob1 <- dmvnorm(theta, mean=mu, sigma=Sigma)
+  prob2 <- dmvnorm(theta, mean=mu1, sigma=Sigma1)
+  prob1 / prob2
+}
+
+N <- 1000000
+thetas <- rmvnorm(N, mean=mu1, sigma=Sigma1)
+
+draws <- tibble(
+  x=thetas[,1],
+  y=thetas[,2]
+)
+draws %>% 
+  ggplot(aes(x=x, y=y)) +
+  geom_point(alpha=0.2)
+
+w_i <- cal_prob_ratio(thetas, mu, mu1, Sigma, Sigma1)
+weighted_thetas <- thetas * w_i
+(mean_thetas <- colMeans(thetas * w_i))
+```
+从上面的模拟结果来看，效果还不错。
+
+但是有一个问题是如何选取这个$q(\theta)$？怎样知道选取的这个分布是高效的？一个常用的衡量标准是有效样本量（effective sample size）。它的定义如下
+$$S_{eff} = \frac{1}{\sum_{i=1}^N \tilde{w}_i^2}$$
+其中，$\tilde{w}_i = w_i / \sum_j w_j$。因此，对于上面的模拟来说，我们可以计算有效样本量
+```{r}
+w_i_tilde <- w_i / sum(w_i)
+(S_eff <- 1 / sum(w_i_tilde**2))
+```
+此外，我们还可以看一下
+
+如果我们换一个分布$q'(\theta) \sim \mathcal{N}(\vec{\mu}_2, \Sigma_1)$，其中
+$$\vec{\mu}_2 = \begin{pmatrix} 1\\ 1 \end{pmatrix}$$
+
+那么我们可以重复上面的模拟
+```{r}
+set.seed(12345)
+library(mvtnorm)
+suppressWarnings(library(tidyverse))
+mu2 <- c(1,1)
+thetas2 <- rmvnorm(N, mean=mu2, sigma=Sigma1)
+w_i2 <- cal_prob_ratio(thetas, mu, mu2, Sigma, Sigma1)
+
+(mean2 <- colMeans(thetas2 * w_i2))
+
+draws2 <- tibble(
+  x = thetas2[,1],
+  y = thetas2[,2]
+)
+
+draws2 %>% 
+  ggplot(aes(x=x, y=y)) +
+  geom_point(alpha=0.2)
+```
+同时这个模拟的有效样本量是
+```{r}
+w_i_tilde2 <- w_i2 / sum(w_i2)
+(S_eff2 <- 1 / sum(w_i_tilde2**2))
+```
+
+从这里可以看出，之前一次模拟中选取的函数更好。
+
+# Self-normalized importance sampling
+上面这种方法的思想很简单也很直观，但是一个问题是如何选择替代概率分布$q(\theta)$。关于这个替代概率分布，有一个限制条件，即积分
+$$E_q(h(\theta)\frac{p(\theta)}{q(\theta)})$$
+的方差是有限的。具体写出就是
+$$\int_\Theta (h(\theta)\frac{p(\theta)}{q(\theta)})^2q(\theta)d\theta = \int_\Theta h^2(\theta) \frac{p^2(\theta)}{q(\theta)}d\theta < + \infty$$
+
+这个限制条件是比较苛刻的。为了放宽这个条件，我们可以采用另外一种方法来近似积分$E_p(h(\theta))$
+$$E_p(h(\theta)) = \frac{\int h(\theta) p(\theta)d\theta}{p(\theta)d\theta} = \frac{\int h(\theta) (p(\theta)/q(\theta)) q(\theta)d\theta}{\int (p(\theta)/q(\theta)) q(\theta)d\theta}$$
+在实际操作中，我们可以生成$\theta_i \sim q(\theta),i=1,\dots, N$，然后利用这组随机变量来估计
+$$E_p(h(\theta)) = \frac{\sum_i h(\theta_i) (p(\theta_i) / q(\theta_i))}{\sum_j p(\theta_j) / q(\theta_j)}$$
+这样做会引入一个小的偏差(bias)，但是可以有限的避免上面提到方差发散的问题。即，我们可以选取的替代概率分布的范围更大了。
+
+# Conclusion
+在本篇文章中，我们介绍了一种简单的Monte Carlo采用方法，importance sampling。这种方法是利用一个简单的替代概率分布来代替复杂的目标概率分布（通常是后验概率分布）来生成合适的随机变量的采样，来计算目标概率分布下的一些统计量。为了减少在替代概率分布选择上的限制，我们引入了self-normalized importance sampling。在本系列的后续文章中，我们会介绍其他的Monte Carlo方法。
