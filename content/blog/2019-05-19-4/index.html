@@ -1,0 +1,188 @@
+---
+title: 高斯混合模型 4
+author: Yi LIU
+date: '2019-05-19'
+slug: '4'
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+  - Unsupervised learning
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+<script src="{{< blogdown/postref >}}index_files/htmlwidgets/htmlwidgets.js"></script>
+<script src="{{< blogdown/postref >}}index_files/viz/viz.js"></script>
+<link href="{{< blogdown/postref >}}index_files/DiagrammeR-styles/styles.css" rel="stylesheet" />
+<script src="{{< blogdown/postref >}}index_files/grViz-binding/grViz.js"></script>
+
+<div id="TOC">
+<ul>
+<li><a href="#简介">简介</a></li>
+<li><a href="#高斯混合模型的生成模型">高斯混合模型的生成模型</a></li>
+<li><a href="#贝叶斯方法求解高斯混合模型">贝叶斯方法求解高斯混合模型</a></li>
+<li><a href="#代码实现">代码实现</a></li>
+<li><a href="#小结">小结</a></li>
+</ul>
+</div>
+
+<div id="简介" class="section level1">
+<h1>简介</h1>
+<p>在前面几篇文章里面，我们介绍了高斯混合模型的定义，它的求解方法（EM算法），以及EM算法的数学背景以及更广义的MM算法。在本篇文章里，我们换一个角度来看高斯混合模型，从贝叶斯角度来分析它。但是因为本文只是阐明一种方法，并不是介绍十分详尽的方法，所以考虑一个简化的问题：假设方差<span class="math inline">\(\{\sigma^2_k\}\)</span>已知。</p>
+</div>
+<div id="高斯混合模型的生成模型" class="section level1">
+<h1>高斯混合模型的生成模型</h1>
+<p>在前面我们在介绍高斯混合模型的求解方法EM算法时，引入了隐变量<span class="math inline">\(z\)</span>。当时是说它是每个观察值的组分指示器
+<span class="math display">\[z_{ik} = \left\{\begin{split} &amp;1,&amp; \text{ if }x_i \in k\text{ th-comp} \\ &amp;0, &amp; \text{ otherwise} \end{split}\right.\]</span></p>
+<p>我们也可以从一个生成模型的角度来看待这个隐变量以及高斯混合模型的观察值，对于观察值<span class="math inline">\(x_i\)</span>，它的产生过程是：</p>
+<ol style="list-style-type: decimal">
+<li>产生组分指示器<span class="math inline">\(z_{i} \sim Categorical(\pi)\)</span></li>
+<li>根据<span class="math inline">\(z_{i}\)</span>的值来生成观察值<span class="math inline">\(x_i \sim \mathcal{N}(\mu_j, \sigma^2_{j})\)</span>，其中<span class="math inline">\(z_{ij}=1\)</span></li>
+</ol>
+<p>这里的<span class="math inline">\(\pi\)</span>就是个组分比例。用图形来表示的话，就是</p>
+<div id="htmlwidget-1" style="width:672px;height:480px;" class="grViz html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"diagram":"\ndigraph generative_model {\n  rankdir = ub\n  subgraph cluster1 {\n  graph [overlay = true, fontsize = 10]\n  node [shape = box] x\n  \n  node [shape = box, color = red, label=\"z\", style = dashed] z\n\n  z->x\n  }\n  node [shape = box, label=\"&pi;\"] pi\n\n  node [shape = box, label=\"&mu;\"] mu\n  mu->x\n  pi->z\n}\n","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+<p>其中实心方框里的是观察值，隐变量<span class="math inline">\(z\)</span>用红色虚线方框标出。</p>
+</div>
+<div id="贝叶斯方法求解高斯混合模型" class="section level1">
+<h1>贝叶斯方法求解高斯混合模型</h1>
+<p>贝叶斯模型的大致步骤是：</p>
+<ol style="list-style-type: decimal">
+<li>对于参数，我们有先验分布（prio distribution）<span class="math inline">\(p(\theta)\)</span></li>
+<li>对于观察到的数据，我们可以得到似然函数<span class="math inline">\(p(x|\theta)\)</span></li>
+<li>最终目的是得到参数的后验分布（posterior distribution）<span class="math inline">\(p(\theta|x) = p(\theta)p(x|\theta) / p(x)\)</span></li>
+</ol>
+<p>但是因为一般后验分布中的分母<span class="math inline">\(p(x) = \int p(\theta)p(x|\theta) dx\)</span>很难得到解析解，我们一般都需要通过近似方法来得到后验概率。一种常见的数值近似方法是使用Markov chain Monte Carlo方法来得到后验分布的近似分布。</p>
+<p>对于含有隐变量的问题来说，我们就有
+<span class="math display">\[p(\theta|x) = \int p(\theta, z|x) dz = \int dz \frac{p(\theta) p(z|\theta)p(x|z,\theta)}{p(x)}\]</span></p>
+<p>具体对于高斯混合模型来说，问题的联合概率可以写出来
+<span class="math display">\[p(\pi, \mu, z, x) = p(\pi) p(\mu)p(z|\pi)p(x|z,\mu)\]</span>
+要求解的后验概率是
+<span class="math display">\[p(\pi, \mu| x) = \int p(\pi, \mu, z| x) dz\]</span>
+下面我们先来求包含隐变量的后验概率分布
+<span class="math display">\[ p(\pi, \mu, z| x) \]</span></p>
+<p>如同前面提到的，对于高斯混合模型的后验分布，我们也很难解析求解，必须使用近似方法求解。这里我们使用Gibbs sampling方法来求解。这个方法的大意是在<span class="math inline">\(t\)</span>迭代中，我们利用之前一次迭代的参数值和条件概率来更新参数值
+<span class="math display">\[\theta^{(t)}_j\sim p(\theta_j|\theta_{-j}^{(t-1)}, x)\]</span>
+其中
+<span class="math display">\[\theta_{-j}^{(t-1)}=(\theta_i^{(t)}, \dots, \theta_{j-1}^{(t)}, \theta_{j+1}^{(t-1)}, \dots , \theta_{p}^{(t-1)})\]</span></p>
+<p>那么对于高斯混合模型来说，我们的策略是，在<span class="math inline">\(t\)</span>次迭代中</p>
+<ol style="list-style-type: decimal">
+<li>生成隐变量
+<span class="math display">\[z_{ik}^{(t)}\sim p(z_{ik}|\theta_{-z_{ik}}^{(t-1)}, x) \propto p(z_{ik}|\pi) p(x|z_{ik}, \mu_k^{(t-1)}) = \prod_i \pi_k^{(t-1)} \phi(x_i; \mu_k^{(t-1)}, \sigma_k^2)\]</span></li>
+<li>生成组分比例参数
+<span class="math display">\[\pi^{(t)}\sim p(\pi|\theta_{-\pi}^{(t-1)}, x) \propto p(\pi) p(z^{(t)}|\pi)\]</span>
+这里我们选取狄利克雷（Dirichlet）先验分布<span class="math inline">\(p(\pi)=\mathcal{D}(\gamma_1, \dots, \gamma_K)\)</span>，那么后验分布就是<span class="math inline">\(p(\pi)p(z^{(t)}|\pi) = \mathcal{D}(\gamma_1+n_1, \dots, \gamma_K+n_K)\)</span>，其中<span class="math inline">\(n_k=\sum_i z_{ik}\)</span></li>
+<li>生成均值
+<span class="math display">\[\mu_k^{(t)}\sim p(x|z^{(t)}, \mu, \sigma^2)p(\mu)\]</span>
+如果选取<span class="math inline">\(p(\mu_k)=\mathcal{N}(\nu, \tau^2)\)</span>，那么我们有后验分布<span class="math inline">\(\mu_k \sim \mathcal{N}(\nu_k(z^{(t)}), \tau_k^2(z^{(t)}))\)</span>，其中
+<span class="math display">\[\nu_k(z^{(t)})=\frac{\nu \sigma^2 + n_k\bar{x}_k \tau^2}{\sigma^2 + n_k \tau^2}\]</span>
+<span class="math display">\[\tau_k^2(z^{(t)}) = \frac{\sigma^2 \tau^2}{\sigma^2 + n_k \tau^2}\]</span>
+<span class="math display">\[n_k = \sum_{i}  z_{ik}^{(t)} \]</span>
+<span class="math display">\[\bar{x}_k = \sum_{i, z_{ik}^{(t)}=1} x_i/n_k\]</span>
+关于高斯分布参数更新的具体推导参见<a href="https://statswithr.github.io/book/bayesian-inference.html#three-conjugate-families">An Introduction to Bayesian Thinking第二章</a></li>
+</ol>
+</div>
+<div id="代码实现" class="section level1">
+<h1>代码实现</h1>
+<pre class="r"><code>set.seed(1234)
+x &lt;- c(rnorm(2000, -2), rnorm(2000, 2))
+hist(x, breaks=500,freq = FALSE)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<pre class="r"><code>tot_steps &lt;- 1000
+z &lt;- matrix(rep(0, 8000), ncol=2)
+pi_mat &lt;- matrix(rep(0, 2*tot_steps), ncol=2)
+
+
+mu1_vec &lt;- rep(0, tot_steps)
+mu2_vec &lt;- rep(0, tot_steps)
+
+library(extraDistr)
+draw_z1 &lt;- function(mu1, mu2, pi1, pi2) {
+  z1 &lt;- numeric(length(x))
+  for (i in 1:length(x)) {
+    prob1 &lt;- pi1 * dnorm(x[i], mean=mu1)
+    prob2 &lt;- pi2 * dnorm(x[i], mean=mu2)
+    prob1 &lt;- prob1 / (prob1 + prob2)
+    z1[i] &lt;- rbinom(1, 1, prob=prob1)
+  }
+  z1
+}
+
+gamma1 &lt;- 1
+gamma2 &lt;- 1
+draw_pi &lt;- function() {
+  pi &lt;- rdirichlet(1, c(gamma1+n1, gamma2+n2))
+  pi
+}
+
+nu &lt;- 0
+sigma1 &lt;- 1
+sigma2 &lt;- 1
+tau &lt;- 5
+
+draw_mu &lt;- function() {
+  nu1 &lt;- (nu*sigma1^2 + sum(x[z[,1]==1]) * tau^2) / (sigma1^2 + n1*tau^2)
+  tau1 &lt;- sigma1*tau/sqrt(sigma1^2 + n1*tau^2)
+  mu1 &lt;- rnorm(1, mean=nu1, sd=tau1)
+  
+  nu2 &lt;- (nu*sigma2^2 + sum(x[z[,2]==1]) * tau^2)/(sigma2^2 + n2*tau^2)
+  tau2 &lt;- sigma2*tau/sqrt(sigma2^2 + n2*tau^2)
+  mu2 &lt;- rnorm(1, mean=nu2, sd=tau2)
+  
+  c(mu1, mu2)
+}
+
+mu1 &lt;- 0.5
+mu2 &lt;- -0.5
+
+pi1 &lt;- 0.5
+pi2 &lt;- 0.5
+
+mu_vec &lt;- c(mu1, mu2)
+pi_update &lt;- c(pi1, pi2)
+for (i in 1:tot_steps) {
+  # update z
+  z[,1] &lt;- draw_z1(mu_vec[1], mu_vec[2], pi_update[1], pi_update[2])
+  z[,2] &lt;- 1 - z[,1]
+  
+  n1 &lt;- sum(z[,1])
+  n2 &lt;- sum(z[,2])
+  
+  # update pi
+  pi_update &lt;- draw_pi()
+  pi_mat[i,] &lt;- pi_update
+  
+  # update mu
+  mu_vec &lt;- draw_mu()
+  mu1_vec[i] &lt;- mu_vec[1]
+  mu2_vec[i] &lt;- mu_vec[2]
+  
+}</code></pre>
+<pre class="r"><code>mean(mu1_vec)</code></pre>
+<pre><code>## [1] 2.010617</code></pre>
+<pre class="r"><code>par(mfrow=c(1, 2))
+hist(mu1_vec, breaks = 30)
+plot(mu1_vec)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<pre class="r"><code>mean(mu2_vec)</code></pre>
+<pre><code>## [1] -1.997225</code></pre>
+<pre class="r"><code>par(mfrow=c(1, 2))
+hist(mu2_vec, breaks = 30)
+plot(mu2_vec)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>我们还可以看看结果的分布</p>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p>从上面的结果可以看到，我们的算法效果还不错。</p>
+</div>
+<div id="小结" class="section level1">
+<h1>小结</h1>
+<p>在本文中，我们介绍了贝叶斯观点下的高斯混合模型，并且使用MCM的一个特例，Gibbs采样来近似了数据的后验概率。与之前的文章类似，本文的目的是通过一些代码，尽可能简单的阐明一些算法实现，对于算法的质量并没有太多要求。</p>
+</div>
