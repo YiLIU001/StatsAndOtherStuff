@@ -20,16 +20,16 @@ link-citation: true
 
 # EM算法的一般定义
 
-在高斯混合模型中使用EM算法时，我们引入了隐变量$z$，首先计算了它在目前参数值下的期望值（E-step），然后利用这个期望值计算全数据似然函数并更新参数（M-step）。实际上，这个算法做的是下面一件事情：在每一次迭代$t$中，我们定义了一个原来似然函数的代替函数（surrogate function）
+在高斯混合模型中使用EM算法时，我们引入了隐变量 `\(z\)`，首先计算了它在目前参数值下的期望值（E-step），然后利用这个期望值计算全数据似然函数并更新参数（M-step）。实际上，这个算法做的是下面一件事情：在每一次迭代 `\(t\)`中，我们定义了一个原来似然函数的代替函数（surrogate function）
 `$$Q(\theta|\theta^{(t)}) = \sum_z Pr(z|x,\theta^{(t)})\log Pr(x, z|\theta)$$`
-然后在每步迭代中都优化$\theta$。把上面的式子展开就得到
+然后在每步迭代中都优化 `\(\theta\)`。把上面的式子展开就得到
 `$$\begin{split} & Q(\theta|\theta^{(t)}) \\ = & \sum_z \sum_i \sum_k Pr(z|x,\theta^{(t)}) z_{ik} \left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \\ = & \sum_i \sum_k \left(\sum_z Pr(z|x,\theta^{(t)}) z_{ik}\right) \left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \\ = & \sum_i \sum_k E(z|x,\theta^{(t)})\left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \\ = & \sum_i \sum_k \gamma_{ik}\left(\log \pi_k + \log\left[\phi(x_i|\mu_k, \sigma_k^2) \right]\right) \end{split}$$`
 最后一行，正是我们前一篇文章里介绍的算法里优化的函数。
 
-一般意义下的EM算法是这样的：对于一个问题，我们有观察值$x$，想要估计参数$\theta$使得对数似然函数$\ell(\theta|x) = \log Pr(x|\theta)$最大。EM算法的做法是先引入隐变量$z$,然后迭代以下两步
+一般意义下的EM算法是这样的：对于一个问题，我们有观察值$x$，想要估计参数 `\(\theta\)`使得对数似然函数 `\(\ell(\theta|x) = \log Pr(x|\theta)\)`最大。EM算法的做法是先引入隐变量 `\(z\)`,然后迭代以下两步
 
-1.  E-step：计算隐变量的后验概率$Pr(z|x, \theta^{(t)})$
-2.  M-step：定义函数$Q(\theta|\theta^{(t)}) = \sum_z Pr(z|x, \theta^{(t)}) \log Pr(x,z|\theta)$，更新参数
+1.  E-step：计算隐变量的后验概率 `\(Pr(z|x, \theta^{(t)})\)`
+2.  M-step：定义函数 `\(Q(\theta|\theta^{(t)}) = \sum_z Pr(z|x, \theta^{(t)}) \log Pr(x,z|\theta)\)`，更新参数
     $$\theta^{(t+1)} = \arg \max_\theta Q(\theta| \theta^{(t)}) $$
 
 EM算法在M-step时通常比原来的问题要简单，是因为对数函数作用在了全数据似然函数上面，得到的结果比较简单。
@@ -38,16 +38,16 @@ EM算法在M-step时通常比原来的问题要简单，是因为对数函数作
 
 要论证EM算法是有效的，我们要证明在每一次迭代当中EM算法确实增加了对数似然函数。首先我们把对数似然函数利用隐变量改写一下
 `$$\ell(\theta|x) = \log Pr(x|\theta) = \log Pr(x,z|\theta) - \log Pr(z|x, \theta)$$`
-因为对数似然函数和隐变量$z$无关，我们可以把上式两边都乘以一个$z$的概率分布$q(z)$，并对$z$求期望。这时左边还是原来的值，从而得到
+因为对数似然函数和隐变量 `\(z\)`无关，我们可以把上式两边都乘以一个 `\(z\)`的概率分布 `\(q(z)\)`，并对 `\(z\)`求期望。这时左边还是原来的值，从而得到
 `$$\begin{split} & \ell(\theta|x) \\ = & \sum_z q(z) \log Pr(x,z|\theta) - \sum_z q(z) \log Pr(z|x, \theta) \\ = & \sum_z q(z) \log \frac{Pr(x,z|\theta)}{q(z)} - \sum_z q(z) \log \frac{Pr(z|x, \theta)}{q(z)} \\ = & \mathcal{L}(q, \theta) + KL(q(z)||Pr(z|x, \theta)) \end{split}$$`
 因为KL散度始终非负，我们有
 `$$\ell(\theta|x) \geq \mathcal{L}(q, \theta)$$`
-因此，$\mathcal{L}(q, \theta)$是$\ell(\theta|x)$的下界（lower bound）。并且，如果我们取$q(z) = Pr(z|x, \theta^{(t)})$，那么就有$\mathcal{L}(Pr(z|x, \theta^{(t)}), \theta) = Q(\theta|\theta^{(t)}) + \sum_z Pr(z|x, \theta^{(t)}) \log Pr(z|x, \theta^{(t)})$
+因此，$\mathcal{L}(q, \theta)$是 `\(\ell(\theta|x)\)`的下界（lower bound）。并且，如果我们取 `\(q(z) = Pr(z|x, \theta^{(t)})\)`，那么就有 `\(\mathcal{L}(Pr(z|x, \theta^{(t)}), \theta) = Q(\theta|\theta^{(t)}) + \sum_z Pr(z|x, \theta^{(t)}) \log Pr(z|x, \theta^{(t)})\)`
 
-对于第$t$次迭代，在E-step中，我们选取$q^{(t)}(z)=Pr(z|x, \theta^{(t)})$，这就使上式中的第二项KL散度为0。因此，我们有
+对于第 `\(t\)`次迭代，在E-step中，我们选取 `\(q^{(t)}(z)=Pr(z|x, \theta^{(t)})\)`，这就使上式中的第二项KL散度为0。因此，我们有
 `$$\begin{split} & \ell(\theta^{(t)}|x)\\ = & \mathcal{L}(Pr(z|x, \theta^{(t)}), \theta) + \underbrace{KL(Pr(z|x, \theta^{(t)})||Pr(z|x, \theta^{(t)}))}_{=0} \\ = & \mathcal{L}(Pr(z|x, \theta^{(t)}), \theta) \\ = & Q(\theta|\theta^{(t)}) + \underbrace{\sum_z Pr(z|x, \theta^{(t)}) \log Pr(z|x, \theta^{(t)})}_{\text{indeptendent of }\theta} \end{split}$$`
 
-在M-step中，我们对于这个下界优化求解（也就是对$Q$优化，因为上式第二项与$\theta$无关），并更新参数
+在M-step中，我们对于这个下界优化求解（也就是对 `\(Q\)`优化，因为上式第二项与 `\(\theta\)`无关），并更新参数
 `$$\theta^{(t+1)} = \arg\max_\theta \mathcal{L}(Pr(z|x, \theta^{(t)}), \theta) =\arg\max_\theta Q(\theta|\theta^{(t)})$$`
 因此我们有
 `$$\begin{split} & \ell(\theta^{(t+1)}|x)\\ \geq & \mathcal{L}(Pr(z|x, \theta^{(t)}), \theta^{(t+1)}) \quad (\text{KL散度非负})\\ \geq & \mathcal{L}(Pr(z|x, \theta^{(t)}), \theta^{(t)}) \quad (\text{优化求解结果})\\ =& \ell(\theta^{(t)}|x) \quad (\text{E-step结果}) \end{split}$$`
@@ -56,19 +56,19 @@ EM算法在M-step时通常比原来的问题要简单，是因为对数函数作
 
 # EM算法的一些扩展
 
-EM算法解决的问题是当$\ell(\theta|x)$很难优化时，通过引入隐变量$z$，把对数似然函数分解为一个KL散度和一个原对数似然函数下界$\mathcal{L}(q, \theta)$之和。在迭代优化的E-step中，取$q(z)=Pr(z|x,\theta^{(t)})$使KL散度为$0$，最大化了$\mathcal{L}(q, \theta)$。在M-step中，再最大化这个下界，更新参数
+EM算法解决的问题是当 `\(\ell(\theta|x)\)`很难优化时，通过引入隐变量 `\(z\)`，把对数似然函数分解为一个KL散度和一个原对数似然函数下界 `\(\mathcal{L}(q, \theta)\)`之和。在迭代优化的E-step中，取 `\(q(z)=Pr(z|x,\theta^{(t)})\)`使KL散度为 `\(0\)`，最大化了 `\(\mathcal{L}(q, \theta)\)`。在M-step中，再最大化这个下界，更新参数
 `$$\theta^{(t+1)} = \arg\max_\theta \mathcal{L}(Pr(z|x,\theta^{(t)}), \theta)$$`
 
-其实我们是为了优化$\ell(\theta|x)$定义了一个函数$g(\theta|\theta^{(t)}) =\mathcal{L}(Pr(z|x,\theta^{(t)}), \theta)$，它满足下面两个条件：
+其实我们是为了优化 `\(\ell(\theta|x)\)`定义了一个函数 `\(g(\theta|\theta^{(t)}) =\mathcal{L}(Pr(z|x,\theta^{(t)}), \theta)\)`，它满足下面两个条件：
 
 1.  `\(g(\theta|\theta^{(t)}) \leq \ell(\theta|x)\)`
 2.  `\(g(\theta^{(t)}|\theta^{(t)}) = \ell(\theta^{(t)}|x)\)`
 
-这样我们说$g(\theta|\theta^{(t)})$是$\ell(\theta|x)$在$\theta^{(t)}$处的下界（$g(\theta|\theta^{(t)})$ minorize `\(\ell(\theta|x)\)` at `\(\theta^{(t)}\)`）。
+这样我们说 `\(g(\theta|\theta^{(t)})\)`是 `\(\ell(\theta|x)\)`在 `\(\theta^{(t)}\)`处的下界（ `\(g(\theta|\theta^{(t)})\)` minorize `\(\ell(\theta|x)\)` at `\(\theta^{(t)}\)`）。
 
-如果能够选取$\theta^{(t+1)}$使得$\theta^{(t+1)}=\arg\max_\theta g(\theta|\theta^{(t)})$，那么我们就得到
+如果能够选取 `\(\theta^{(t+1)}\)`使得 `\(\theta^{(t+1)}=\arg\max_\theta g(\theta|\theta^{(t)})\)`，那么我们就得到
 `$$\begin{split} & \ell(\theta^{(t+1)}|x) \\ \geq & g(\theta^{(t+1)}|\theta^{(t)}) \\ \geq & g(\theta^{(t)}|\theta^{(t)}) \\ = & \ell(\theta^{(t)}|x) \end{split}$$`
-这样我们就可以优化求解$\ell(\theta^{(t+1)}|x)$。上面的EM算法是一个特例，MM算法还有很多其它的形式，具体可以参看 Hunter and Lange (2004)
+这样我们就可以优化求解 `\(\ell(\theta^{(t+1)}|x)\)`。上面的EM算法是一个特例，MM算法还有很多其它的形式，具体可以参看 Hunter and Lange (2004)
 
 # 小结
 
