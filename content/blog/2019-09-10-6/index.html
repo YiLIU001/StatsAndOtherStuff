@@ -1,0 +1,339 @@
+---
+title: 高斯混合模型 6
+author: Yi LIU
+date: '2019-09-10'
+slug: '6'
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+  - Unsupervised learning
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+<ul>
+<li><a href="#简介introduction">简介(Introduction)</a></li>
+<li><a href="#变分推断variational-inference">变分推断(Variational inference)</a></li>
+<li><a href="#如何解变分推断问题how-to-solve-it">如何解变分推断问题(How to solve it)</a>
+<ul>
+<li><a href="#变分近似variational-approximation">变分近似(Variational approximation)</a></li>
+<li><a href="#坐标上升coordinate-ascent">坐标上升（coordinate ascent）</a></li>
+</ul></li>
+<li><a href="#高斯混合模型的变分推断variational-inference-for-gaussian-mixture-model">高斯混合模型的变分推断(Variational inference for Gaussian mixture model)</a>
+<ul>
+<li><a href="#隐变量的近似approximation-of-latent-variable">隐变量的近似(Approximation of latent variable)</a></li>
+<li><a href="#组分比例的近似approximation-of-component-proportion">组分比例的近似(Approximation of component proportion)</a></li>
+<li><a href="#组分均值的近似approximation-of-means">组分均值的近似(Approximation of means)</a></li>
+<li><a href="#迭代求解的具体表达式expressions-for-iterative-solution">迭代求解的具体表达式(Expressions for iterative solution)</a></li>
+</ul></li>
+<li><a href="#代码实现implementation">代码实现(Implementation)</a></li>
+<li><a href="#总结conclusion">总结(Conclusion)</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+<div id="简介introduction" class="section level1">
+<h1>简介(Introduction)</h1>
+<p>在前面的两篇文章里面，我们介绍了贝叶斯观点下的高斯混合模型，并使用了MCMC算法来近似参数的后验概率。对于贝叶斯问题来说，求解后验概率通常是比较困难的。因此我们会使用一些近似方法。常用的近似方法有两种：</p>
+<ol style="list-style-type: decimal">
+<li>随机近似方法（stochastic approximation）：我们前面使用的MCMC方法就属于这一类</li>
+<li>决定性近似方法（deterministic approximation）：本篇文章介绍的变分推断（variational inference）其中的一种方法。</li>
+</ol>
+</div>
+<div id="变分推断variational-inference" class="section level1">
+<h1>变分推断(Variational inference)</h1>
+<p>变分推断主要是在需要求解的概率分布十分复杂，难以得到准确解时，用来近似概率分布的。贝叶斯问题里的后验概率往往难以求解，因此常用的解法之一就是变分推断。</p>
+<p>在贝叶斯问题中，我们先定义参数的先验概率<span class="math inline">\(p(\theta)\)</span>，然后根据观察数据，要求得参数的后验概率<span class="math inline">\(p(\theta|x)\)</span>。当这个概率分布不容易求得时，我们可以在一个给定的分布空间<span class="math inline">\(\mathcal{Q}\)</span>里寻找一个概率分布<span class="math inline">\(q^*(\theta)\)</span>是的它和<span class="math inline">\(p(\theta|x)\)</span>的距离（KL-散度）最小
+<span class="math display">\[q^*(\theta) = \arg \min_{q\in \mathcal{Q}} KL(q(\theta) || p(\theta|x))\]</span>
+如果有隐变量<span class="math inline">\(z\)</span>的话，我们也可以把它吸收进<span class="math inline">\(\theta\)</span>里，即<span class="math inline">\(\theta=(\theta, z)\)</span>。因此在变分推断中，不需要特意区分参数与隐变量，可以统一处理两者。（注意，我们这里的记号和别处可能会有不同，我们用<span class="math inline">\(\theta\)</span>来代表参数，别处可能会用<span class="math inline">\(z\)</span>来代表参数，比如 <span class="citation"><a href="#ref-Bishop2006" role="doc-biblioref">Bishop</a> (<a href="#ref-Bishop2006" role="doc-biblioref">2006</a>)</span>）。这个近似的分布<span class="math inline">\(q^*(\theta)\)</span>就是变分推断的解。</p>
+<p>一点题外话，为什么这种方法要叫变分推断？这主要是因为我们是在分布函数空间里面求解一个最小化问题，通常这种问题的求解在数学里叫做变分法。此外，贝叶斯问题里求后验概率通常叫做推断。所以就有了这个名字。</p>
+<p>直接最小化KL-散度来求<span class="math inline">\(q^*(\theta)\)</span>是困难的，因为
+<span class="math display">\[KL(q(\theta)||p(\theta|x)) = -\int q(\theta) \log \frac{p(\theta|x)}{q(\theta)} d\theta\]</span>
+等号右边积分当中就含有我们想要近似的后验概率<span class="math inline">\(p(\theta|x)\)</span>。如果我们知道它的表达式，我们已经解决了问题，不会再需要变分推断了。为了解决这个问题，我们可以使用在EM算法里使用过的一个技巧
+<span class="math display">\[\begin{split}
+&amp; \log p(x) \\
+= &amp; \log p(x) \underbrace{\int q(\theta) d\theta}_{=1} \\
+= &amp; \int q(\theta) \log p(x) d\theta \\
+= &amp; \int q(\theta) \log \left[ \frac{p(x, \theta)}{p(\theta|x)} \right] d\theta \\
+= &amp; \int q(\theta) \log p(x, \theta) d\theta - \int q(\theta) \log p(\theta|x) d\theta \\
+= &amp; \int q(\theta) \log \left[\frac{p(x, \theta)}{q(\theta)} \right] d\theta - \int q(\theta) \log \left[\frac{p(\theta|x)}{q(\theta)}\right] d\theta \\
+= &amp; ELBO(q(\theta)) + KL(q(\theta)||p(\theta|x))
+\end{split}\]</span>
+上式最后一行的第一项被称作evidence lower bound(ELBO)，第二项就是我们想要最小化的KL-散度。为了更清楚一点，我们把上式的结果写在一行
+<span class="math display">\[\log p(x) = ELBO(q(\theta)) + KL(q(\theta)||p(\theta|x))\]</span>
+等式左边一项和<span class="math inline">\(q(\theta)\)</span>无关，因此不管我们怎样优化<span class="math inline">\(q(\theta)\)</span>, 等式右边两项之和都不变。也就是说，最小化第二项，就等价于最大化第一项。而第一项并不包含未知的后验概率<span class="math inline">\(p(\theta|x)\)</span>，是可以求解的。因此，我们的问题转化为
+<span class="math display">\[q^*(\theta)=\arg\min_{q(\theta)\in \mathcal{Q}} KL(q(\theta)||p(\theta|x)) = \arg\max_{q(\theta)\in \mathcal{Q}} ELBO(q(\theta))\]</span>
+因此，我们的问题就转化为最大化ELBO。</p>
+</div>
+<div id="如何解变分推断问题how-to-solve-it" class="section level1">
+<h1>如何解变分推断问题(How to solve it)</h1>
+<div id="变分近似variational-approximation" class="section level2">
+<h2>变分近似(Variational approximation)</h2>
+<p>上面的问题是在分布函数空间里面找一个最优解，但是分布函数空间是一个无穷维空间（关于这一点，可以把分布函数的输入空间<span class="math inline">\(\mathcal{\Theta}\)</span>上的每一点<span class="math inline">\(\theta\)</span>看成一个维度，因为函数<span class="math inline">\(q(\theta)\)</span>在这一点的取值和其他点的取值无关，因为<span class="math inline">\(\Theta\)</span>上的点有无数个，因此这是一个无穷维空间）。在这个空间里面寻找最优解，是非常困难的。这个时候，我们就需要采用近似算法了。这里的近似是限制我们的搜索空间，即限定<span class="math inline">\(q(\theta)\)</span>可以取的形式。比如，对于参数<span class="math inline">\(\theta=\{\theta_1, \dots, \theta_p\}\)</span>，我们可以限定<span class="math inline">\(q(\theta)\)</span>是乘积形式，即
+<span class="math display">\[q(\theta) = \prod_{k=1}^p q_k(\theta_k)\]</span>
+那么这时，ELBO的形式就是
+<span class="math display">\[\begin{split}
+&amp;ELBO(q)\\
+= &amp; \int \prod_k q_k(\theta_k) \log p(x,\theta) d\theta_k - \int \prod_k  q_k(\theta_k) \log \left( \prod_l q_l(\theta_l) \right)d\theta_k \\
+= &amp; \int \prod_k q_k(\theta_k) \log p(x,\theta) d\theta_k - \int \prod_k  q_k(\theta_k) \sum_l \log q_l(\theta_l) d\theta_k \\
+= &amp; \int \prod_k q_k(\theta_k) \log p(x,\theta) d\theta_k - \sum_l \int \prod_k  q_k(\theta_k) \log q_l(\theta_l) d\theta_k \\
+= &amp; \int \prod_k q_k(\theta_k) \log p(x,\theta) d\theta_k - \sum_l \int q_l(\theta_l) \log q_l(\theta_l) d\theta_l (\text{ 概率分布积分为1}) \\
+= &amp; \int \prod_k q_k(\theta_k) \log p(x,\theta) d\theta_k - \sum_k \int q_k(\theta_k) \log q_k(\theta_k) d\theta_k (\text{ 改变求和哑指标})
+\end{split}\]</span></p>
+</div>
+<div id="坐标上升coordinate-ascent" class="section level2">
+<h2>坐标上升（coordinate ascent）</h2>
+<p>当我们专注于优化<span class="math inline">\(q_l\)</span>时，可以把第一项里的其它参数积分掉，然后只保留第二项里的<span class="math inline">\(q_l\)</span>
+<span class="math display">\[\begin{split}
+&amp; ELBO(q) \\
+= &amp; \int q_l(\theta_l) \log \tilde{p}(x,\theta_l) d\theta_l - \int q_l(\theta_l) \log q_l(\theta_l) d\theta_l \\
+= &amp; - KL(q_l(\theta_l) || \tilde{p}(x, \theta_l))
+\end{split}\]</span>
+其中
+<span class="math display">\[\log \tilde{p}(x,\theta_l) = \int \prod_{k \neq l} q_k(\theta_k) \log p(x,\theta) d\theta_k = \mathbb{E}_{k\neq l} \left[ \log p(x, \theta) \right]\]</span>
+因此，<span class="math inline">\(q_l(\theta_l)\)</span>最大化ELBO时，它的取值是
+<span class="math display">\[q_l^*(\theta_l) = \tilde{p}(x,\theta_l) + \text{constant}\]</span>
+上式中的常数是为了保证联合概率<span class="math inline">\(q^*(\theta)=\prod q^*_l(\theta_l)\)</span> 是一个恰当的概率分布函数。</p>
+<p>但是，上面的解会依赖于其它的<span class="math inline">\(q_k(\theta_k)\)</span>，我们需要的是一组自洽（self-consistent）的解，即对于每个<span class="math inline">\(l\)</span>来说，我们需要
+<span class="math display">\[\left\{ \begin{split} &amp; \log q_l^*(\theta_l) = \mathbb{E}_{k\neq l} \left[ \log p(x, \theta) \right] + constant,\\
+&amp; \mathbb{E}_{k\neq l} \left[ \log p(x, \theta) \right] = \int \prod_{k \neq l} q^*_k(\theta_k) \log p(x,\theta) d\theta_k \end{split} \right.\]</span>
+那么怎样保证得到的解是自洽的呢？其实上面每一次更新参数都是增加ELBO的，只要最后ELBO收敛了，就是一组自洽解。因此通常的做法是采用迭代求解，具体做法如下：</p>
+<ol style="list-style-type: decimal">
+<li>初始化各个参数的分布<span class="math inline">\(q_l(\theta_l)\)</span></li>
+<li>迭代计算，对于<span class="math inline">\(t=1,2,\dots\)</span>：
+<ol style="list-style-type: lower-alpha">
+<li>对于<span class="math inline">\(l \in \{1, \dots, p\}\)</span>，使<span class="math inline">\(\log q_l^{(t)}(\theta_l) = \mathbb{E}_{q^{(t-1)}_{-l}} \left[ \log p(x, \theta) \right] + const\)</span></li>
+</ol></li>
+<li>如果ELBO没有收敛，重复第二步。</li>
+</ol>
+<p>在上面的算法中
+<span class="math display">\[q^{(t-1)}_{-l}=q_1^{(t)}(\theta_1)q_2^{(t)}(\theta_2)\dots q_{j-1}^{(t)}(\theta_{j-1})q_{j+1}^{(t-1)}(\theta_{j+1})q_{p}^{(t-1)}(\theta_{p})\]</span></p>
+</div>
+</div>
+<div id="高斯混合模型的变分推断variational-inference-for-gaussian-mixture-model" class="section level1">
+<h1>高斯混合模型的变分推断(Variational inference for Gaussian mixture model)</h1>
+<p>下面我们用之前提到的高斯混合模型作为示例来演示上面的算法。为了简化问题，我们还是假定方差已知，而且我们也知道共有<span class="math inline">\(K\)</span>个组分，那么只需要估计参数和隐变量<span class="math inline">\(\{z, \pi,\mu\}\)</span>。那么模型的联合分布为
+<span class="math display">\[p(x, z, \pi, \mu) = p(\pi) p(\mu)p(z|\pi)p(x|z, \mu)\]</span>
+对于似然函数，我们有
+<span class="math display">\[p(x|z,\mu)=\prod_{i=1}^n \prod_{k=1}^K \left(\mathcal{N}(x_i|\mu_k, \sigma_k^2)\right)^{z_{ik}}\]</span>
+对于隐变量的分布，我们有
+<span class="math display">\[p(z|\pi) = \prod_{i=1}^n \prod_{k=1}^K \pi_k^{z_{ik}}\]</span>
+下面我们要选定先验概率。对于组分比例<span class="math inline">\(\pi\)</span>，我们选取Dirichlet分布
+<span class="math display">\[p(\pi)=\mathcal{D}(\gamma_1, \dots,\gamma_K)\]</span>
+对于组分均值，我们选取高斯分布
+<span class="math display">\[p(\mu_k) = \mathcal{N}(\nu, \tau^2)\]</span>
+那么就得到
+<span class="math display">\[\begin{split}
+&amp; \log p(x, z, \pi, \mu) \\
+= &amp; \sum_k \log p(\pi_k) + \sum_k \log p(\mu_k) + \sum_i \sum_k z_{ik} \log \pi_k \\
+&amp; + \sum_i \sum_k z_{ik} \log \mathcal{N}(x_i | \mu_k, \sigma_k^2)
+\end{split}\]</span></p>
+<div id="隐变量的近似approximation-of-latent-variable" class="section level2">
+<h2>隐变量的近似(Approximation of latent variable)</h2>
+<p>我们限定<span class="math inline">\(q(z, \pi, \mu)\)</span>的形式为
+<span class="math display">\[q(z, \pi, \mu) = q(z)q(\pi)q(\mu)\]</span>
+先看迭代过程中<span class="math inline">\(q(z)\)</span>的更新
+<span class="math display">\[\begin{split}
+&amp; \log q^*(z) \\
+=&amp;  \mathbb{E}_{\pi, \mu} \left[ \log p(x, z, \pi, \mu)\right] + const\\
+=&amp; \mathbb{E}_{\pi, \mu} \left[ \log p(\pi) + \log p(\mu) + \log p(z|\pi) + \log p(x|z, \mu) \right] + const \\
+=&amp; \mathbb{E}_{\pi, \mu} [\log p(z|\pi)] + \mathbb{E}_{\pi, \mu} [\log p(x|z, \mu)] + const \\
+\end{split}\]</span>
+第一项可以计算出结果
+<span class="math display">\[\begin{split}
+&amp; \mathbb{E}_{\pi, \mu} [\log p(z|\pi)] \\
+= &amp; \mathbb{E}_{\pi, \mu} \left[ \sum_i \sum_k z_{ik} \log \pi_k \right] \\
+= &amp; \sum_i \sum_k z_{ik} \mathbb{E}_{\pi} [\log \pi_k]
+\end{split}\]</span>
+第二项可以计算出结果
+<span class="math display">\[\begin{split}
+&amp; \mathbb{E}_{\pi, \mu} [\log p(x|z, \mu)] \\
+= &amp; \mathbb{E}_{\pi, \mu} \left[ \sum_i \sum_k z_{ik} \log \left( \frac{1}{\sqrt{2\pi \sigma_k^2}}  \exp \left( -\frac{(x_i-\mu_k)^2}{2\sigma_k^2}\right)\right) \right] \\
+= &amp; \sum_i \sum_k z_{ik} \left(-0.5 \log 2 \pi \sigma_k^2 - \frac{(x_i-\mu_k)^2}{2\sigma_k^2}  \right) \\
+\end{split}\]</span>
+合并这两项，我们有
+<span class="math display">\[\log q^*(z) = \sum_i \sum_k z_{ik} \log \rho_{ik} + const\]</span>
+其中
+<span class="math display">\[\begin{split}
+&amp; log \rho_{ik} \\
+= &amp; \mathbb{E}_\pi [\log \pi_k] - \frac{1}{2} \log (2\pi \sigma_k^2) \\
+&amp; - \frac{1}{2\sigma_k^2} \mathbb{E}_\mu (x_i - \mu_k)^2
+\end{split}\]</span>
+那么可以得到
+<span class="math display">\[q^*(z) = \text{normalization factor}_i \times \rho_{ik}^{z_{ik}}\]</span>
+这是一个典型的Categorical分布，很容易得到归一化常数
+<span class="math display">\[\text{normalization factor}_i=\sum_k \rho_{ik}\]</span>
+最终的近似分布是
+<span class="math display">\[q^*(z)=\sum_i \sum_k r_{ik}^{z_{ik}}\]</span>
+其中
+<span class="math display">\[r_{ik} = \frac{\rho_{ik}}{\sum_l \rho_{il}}\]</span></p>
+</div>
+<div id="组分比例的近似approximation-of-component-proportion" class="section level2">
+<h2>组分比例的近似(Approximation of component proportion)</h2>
+<p>现在我们考虑<span class="math inline">\(\pi\)</span>的近似
+<span class="math display">\[\begin{split}
+&amp; \log q^*(\pi)\\
+= &amp; \mathbb{E}_{z, \mu} \log p(x, z, \pi, \mu) \\
+= &amp; \mathbb{E}_{z, \mu} \left[\log p(\pi) + \log p(\mu) + \log p(z|\pi) + \log p(x|z, \mu)\right] \\
+= &amp; \log p(\pi) + \mathbb{E}_{\mu} [\log p(\mu)] + \mathbb{E}_{z} [\log p(z|\pi)] + const \\
+= &amp; \sum_k \gamma_k \log \pi_k + \sum_i \sum_k \log \pi_k \mathbb{E}_{z} [z_{ik}] + const \\
+= &amp; \sum_k \log \pi_k \left(\gamma_k + \sum_i  \mathbb{E}_{z} [z_{ik}] \right)
+\end{split}\]</span>
+因此，很容易看出组分比例的近似也是Dirichlet分布
+<span class="math display">\[q^*(\pi) = \mathcal{D}(\gamma_1 + N_1, \dots, \gamma_K + N_K)\]</span>
+其中<span class="math inline">\(N_k = \sum_i \mathbb{E}_{z} [z_{ik}]\)</span>。</p>
+</div>
+<div id="组分均值的近似approximation-of-means" class="section level2">
+<h2>组分均值的近似(Approximation of means)</h2>
+<p>对于组分均值，我们有
+<span class="math display">\[\begin{split}
+&amp; \log q^*(\mu) \\
+= &amp; \mathbb{E}_{z, \pi} \log p(x, z, \pi, \mu) \\
+= &amp; \mathbb{E}_{z, \pi} \left[ \log p(\pi) + \log p(\mu) + \log p(z|\pi) + \log p(x|z, \mu)\right] \\
+= &amp; \log p(\mu) + \mathbb{E}_{z} \log p(x|z, \mu) + const \\
+= &amp; \sum_k -\frac{(\mu_k - \nu)^2}{2\tau^2} - \sum_i \sum_k \mathbb{E}_z [z_{ik}] \frac{(x_i-\mu_k)^2}{2\sigma_k^2} + const\\
+= &amp; \sum_k - \frac{1}{2\frac{\tau^2 \sigma_k^2}{\sigma_k^2 + n_k \tau^2}}\left(\mu_k - \frac{\sigma_k^2 \nu + \tau^2 \sum_i \mathbb{E}_{z}[z_{ik}] x_i}{\sigma_k^2 + n_k \tau^2} \right)^2 + const
+\end{split}\]</span>
+这是一个高斯分布，即
+<span class="math display">\[q^*(\mu_k) = \mathcal{N}(\nu_k, \tau_k^2)\]</span>
+其中
+<span class="math display">\[\nu_k = \frac{\sigma_k^2 \nu + \tau^2 \sum_i \mathbb{E}_{z}[z_{ik}] x_i}{\sigma_k^2 + n_k \tau^2} \]</span>
+<span class="math display">\[\tau_k^2 = \frac{\tau^2 \sigma_k^2}{\sigma_k^2 + n_k \tau^2}\]</span></p>
+</div>
+<div id="迭代求解的具体表达式expressions-for-iterative-solution" class="section level2">
+<h2>迭代求解的具体表达式(Expressions for iterative solution)</h2>
+<p>上面我们给出了近似分布的类型，它们和先验分布具有一样的形式。这个原因在于我们选取的先验分布的类型是共轭分布。我们需要做的就是更新这些分布的参数就可以了。但是要得到这些参数更新，还是需要计算其中的一些均值才能得到具体的表达式。</p>
+<p>对于隐变量，我们需要计算的均值如下
+<span class="math display">\[\mathbb{E}_\pi [\log \pi_k] = digamma(\tilde{\gamma}_k) - digamma(\sum_l \tilde{\gamma}_l)\]</span>
+其中<span class="math inline">\(\tilde{\gamma}_k=\gamma_k + N_k\)</span>
+<span class="math display">\[\mathbb{E}_\mu (x_i - \mu_k)^2= x_i^2 - 2x_i \nu_k + (\nu_k^2 + \tau_k^2)\]</span>
+因此我们有
+<span class="math display">\[\begin{split}
+&amp; log \rho_{ik} \\
+= &amp; digamma(\tilde{\gamma}_k) - digamma(\sum_l \tilde{\gamma}_l) \\
+  &amp;- \frac{1}{2} \log (2\pi \sigma_k^2) - \frac{1}{2\sigma_k^2}[x_i^2\\
+  &amp; -2x_i\nu_k + (\nu_k^2+\tau_k^2)]
+\end{split}\]</span></p>
+<p>对于组分比例，我们需要计算的均值如下
+<span class="math display">\[\mathbb{E}_z [z_{ik}] = r_{ik}\]</span></p>
+<p>对于均值，我们需要计算的均值也是<span class="math inline">\(\mathbb{E}_z [z_{ik}]\)</span>。</p>
+<p>因此，高斯混合模型的变分推断具体过程如下</p>
+<ol style="list-style-type: decimal">
+<li>选取初始超参数</li>
+<li>迭代以下过程，直至ELBO收敛：
+<ol style="list-style-type: lower-alpha">
+<li>更新<span class="math inline">\(z\)</span>的参数，计算<span class="math inline">\(r_{ik}\)</span>（类似于EM算法的E-step）</li>
+<li>更新<span class="math inline">\(\{\pi_k\}\)</span>以及<span class="math inline">\(\{\mu_k\}\)</span>的参数（类似于EM算法的M-step）</li>
+</ol></li>
+</ol>
+</div>
+</div>
+<div id="代码实现implementation" class="section level1">
+<h1>代码实现(Implementation)</h1>
+<p>首先我们生成数据</p>
+<pre class="r"><code>set.seed(1234)
+x &lt;- c(rnorm(2000, -2), rnorm(2000, 2))
+hist(x, breaks=500,freq = FALSE)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<p>然后我们定义先验分布的参数</p>
+<pre class="r"><code>K &lt;- 2
+gamma_vec &lt;- rep(1, K)
+nu &lt;- 0
+tau_square &lt;- 1</code></pre>
+<p>下面是具体实现代码</p>
+<pre class="r"><code>vb_Gaussian &lt;- function(x, sigmaK, max_iter, K) {
+  lower_bound &lt;- -Inf
+  N &lt;- length(x)
+  sigmaK_square &lt;- sigmaK**2
+  
+  resp &lt;- initialize_resp(N, K)
+  
+  for (i in 1:max_iter) {
+    Nk &lt;- colSums(resp)
+    
+    # update gamma
+    gammaK &lt;- Nk + gamma_vec
+    
+    # Calculate auxilary variables
+    zik_x &lt;- colSums(resp * x)
+    nuK &lt;- (sigmaK_square * nu + tau_square *zik_x) / (sigmaK_square + tau_square * Nk)
+    
+    tauK_square &lt;- (tau_square * sigmaK_square) / (sigmaK_square + Nk * tau_square)
+    tauK &lt;- sqrt(tauK_square)
+    
+    # update resp
+    resp &lt;- cal_resp(gamma_vec, Nk, sigmaK_square, nuK, tauK)
+  }
+  
+  return(list(resp=resp, nuK=nuK, tauK_square=tauK_square))
+}
+
+initialize_resp &lt;- function(N, K) {
+  resp &lt;- matrix(abs(rnorm(N*K)), nrow=N, ncol=K)
+  normal_constant &lt;- rowSums(resp)
+  resp &lt;- resp / normal_constant
+  resp
+}
+
+cal_resp &lt;- function(gamma_vec, Nk, sigmaK_square, nuK, tauK) {
+  gamma_tilde &lt;- gamma_vec + Nk
+  gamma_tilde_sum &lt;- sum(gamma_tilde)
+  
+  # rho_ik: N * K matrix
+  log_rho_ik &lt;- digamma(gamma_tilde) - digamma(gamma_tilde_sum)
+  log_rho_ik &lt;- matrix(log_rho_ik, nrow=length(x), ncol=length(Nk),
+                   byrow = TRUE)
+  log_rho_ik &lt;- t(t(log_rho_ik) - 0.5*log(2*pi*sigmaK_square))
+  
+  log_rho_ik &lt;- log_rho_ik - x^2 %o% (0.5/sigmaK_square)
+  log_rho_ik &lt;- log_rho_ik - x %o% (nuK / sigmaK_square)
+  log_rho_ik &lt;- t(t(log_rho_ik) - (nuK^2 + tauK^2) / (2*sigmaK_square))
+  rho_ik &lt;- get_rho(log_rho_ik)
+  
+  r_ik &lt;- rho_ik / (rowSums(rho_ik))
+  return(r_ik)
+}
+
+get_rho &lt;- function(log_rho_ik_tilde) {
+  log_rho_max_tilde &lt;- matrixStats::rowMaxs(log_rho_ik_tilde)
+  log_rho_ik_tilde &lt;- log_rho_ik_tilde - log_rho_max_tilde
+  return(exp(log_rho_ik_tilde))
+}</code></pre>
+<p>在上面的代码中，我们用到了和EM算法中类似的log-sum trick。这个算法的结果如下</p>
+<pre class="r"><code>set.seed(1234)
+res &lt;- vb_Gaussian(x, rep(1,2), 20, 2)
+res$nuK</code></pre>
+<pre><code>## [1] -2.000459  2.006817</code></pre>
+<pre class="r"><code>res_df &lt;- tibble(
+  x=x, label=factor(apply(res$resp, 1, which.max)),
+  index=1:length(x))
+
+res_df %&gt;% 
+  ggplot(aes(x=index, y=x, color=label)) +
+  geom_point()</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<p>从上面的结果中，我们可以看出，对于两组分均值的估计，算法实现的估计比较准确，同时对于<span class="math inline">\(x\)</span>的聚类，也是比较准确的。</p>
+</div>
+<div id="总结conclusion" class="section level1">
+<h1>总结(Conclusion)</h1>
+<p>在本文中，我们实现了高斯混合模型的变分推断。和Gibbs采样时的例子一样，我们假设方差是已知的。这简化了推导过程，如果想要了解方差也是模型参数的推导过程，请参阅 <span class="citation"><a href="#ref-Bishop2006" role="doc-biblioref">Bishop</a> (<a href="#ref-Bishop2006" role="doc-biblioref">2006</a>)</span> 的第十章。</p>
+<p>和往常一样，本文中的代码并不符合很好的代码规范。因为这里主要是起到一个解释算法的作用，所以并没有太多关注实现上的最佳实践。</p>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-Bishop2006" class="csl-entry">
+Bishop, Christopher M. 2006. <em>Pattern Recognition and Machine Learning (Information Science and Statistics)</em>. Berlin, Heidelberg: Springer-Verlag.
+</div>
+</div>
+</div>
