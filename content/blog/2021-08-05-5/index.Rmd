@@ -1,0 +1,81 @@
+---
+title: 高斯混合模型 5
+author: Yi LIU
+date: '2019-05-27'
+slug: '5'
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+  - Unsupervised learning
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+
+# 简介
+在前一篇文章里，我们引入了贝叶斯观点下的高斯混合模型，并且使用了Gibbs采样来近似参数的后验概率。但是之前的方法有一个问题，对于每个不同的模型，我们都需要根据这个模型来写出特定的采样方法。而且对于模型复杂的模型来说，这个特定的采样方法很难得到。那么有没有办法把这个复杂的步骤自动化呢？即我们只需要写出模型，通过一些方法来自动得到采样方法，并输出结果呢？这种方法是有的，我们可以通过概率编程语言（probabilstic programming language）来实现这一目的。
+
+在本文中，我们把上一篇文章里的问题用概率编程语言来实现，作为这种方法的一个简单介绍。内容很简单，只是起一个引子的作用。
+
+# 高斯混合模型的编程实现
+我们先生成和之前一样的数据
+```{r}
+set.seed(1234)
+x <- c(rnorm(2000, -2), rnorm(2000, 2))
+hist(x, breaks=500,freq = FALSE)
+```
+下面我们载入`rjags`包，并定义模型
+```{r, message=FALSE}
+suppressMessages(library(rjags))
+model_string <- "
+model {
+# likelihood
+for (i in 1:N) {
+z[i] ~ dcat(pi[1:2])
+x[i] ~ dnorm(mu[z[i]], 1)
+}
+
+# priors
+pi ~ ddirch(c(1,1))
+mu ~ dmnorm(c(0,0), W)
+
+}
+"
+```
+现在我们来进行Gibbs采样
+```{r}
+j1 <- jags.model(
+  file=textConnection(model_string),
+  data=list(x=x,
+            N=length(x),
+            W=diag(0.2, 2, 2)),
+  n.adapt = 100)
+j1_samples <- jags.samples(j1, c("pi", "mu"), n.iter=1000)
+```
+
+下面我们看看`rjags`程序给出的结果
+```{r}
+mu_samples <- as.mcmc.list(j1_samples$mu)
+
+plot(mu_samples[,1])
+plot(mu_samples[,2])
+```
+从上面的图可以看出，程序的结果不错。
+
+# 小结
+之前我们实现Gibbs采样时，具体采样方法需要自己推导和实现。这样的做法很容易产生错误，而且工作量也比较大。在本文中们，我们介绍了一个可以使这一系列工作系统化的包`rjags`。和之前的代码比起来，本文中的代码要简单很多，而且结果也很好。
+
+实际上，`rjags`是一种概率编程语言。类似的包还有很多，比如：
+
+* [`stan`](https://mc-stan.org/)：有多种程序语言接口，包括`R`，`python`，`Julia`等。`stan`主要支持Hamiltonian Monte Carlo，因此并不支持对于离散变量的采样。我们介绍的高斯混合模型中的$z$就无法通过`stan`来获得。但是对于高斯混合模型，可以直接使用不含隐变量的对数似然函数来建模求解（即marginalization trick）。
+* [`pymc3`](https://docs.pymc.io/)：使用`theano`做后端的`python`包，可以使用MCMC来近似后验概率，也可以使用变分推断来近似后验概率（关于变分近似，请看后续文章）。目前`pymc4`也在开发，据说会使用`tensorflow`做后端。
+* [`turing`](https://turing.ml/)：一个`Julia`包，主要是MCMC采样。我没有太多经验，就不多做介绍了。
+
+它们的功能要远比实现一个高斯混合模型复杂的多。这里我们只是稍做介绍，关于具体的功能，可以参看它们的主页。
