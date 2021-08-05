@@ -1,0 +1,239 @@
+---
+title: Monte Carlo 2
+author: R package build
+date: '2021-07-28'
+slug: monte-carlo-2
+categories: []
+tags: []
+---
+
+## 简介(Introduction)
+
+在Importance Sampling (IS)中，一个对于采样效率和采样结果可靠性的很重要的因素是如何选取替代分布概率$q(\theta)$。这其中有很多因素需要考虑，比如$q(\theta)$的取值范围是否涵盖了我们的目标概率分布$p(\theta)$的取值范围，怎样可以使得采样的方差比较小。这些需要大量的关于$p(\theta)$的知识和经验才能设计出合适的$q(\theta)$。
+
+那么有没有一种采样方法能减少这个选取过程中的工作量呢？答案是有的。下面我们就介绍这样一种方法：Markov Chain Monte Carlo (MCMC)。MCMC的基本想法是如果我们有一条Markov chain，如果它的稳态分布(stationary distribution)就是我们的目标分布，那么我们从这条Markov chain上生产足够多的达到稳态后的样本，那么我们就得到了目标函数的采样。
+
+那么现在的问题是：怎样生成一条问题分布是目标分布的Markov chain？因为Markov chain的稳态分布完全由转移概率(transition probability)决定，那么这也就等价于设计Markov chain的转移概率分布，使得Markov chain的稳态分布就是我们的目标分布。幸运的是，这个问题可以用一个比较通用的算法解决。在介绍这个算法之前，我们先简单介绍一下Markov chain。
+
+## Markov chain
+
+Markov chain是一种随机过程，包含了一系列随机变量$\Theta_1, \Theta_2, \dots$，它们满足如下关系：
+
+$$ P(\Theta_{n+1} =\theta_{i_{n+1}} | \Theta_{n} = \theta_{i_{n}}, \dots, \Theta_1 = \theta_{i_1}) = P(\Theta_{n+1} =\theta_{i_{n+1}} | \Theta_{n} = \theta_{i_{n}}) $$
+
+也就是说下一个状态的取值只和现在的状态取值有关。
+
+
+
+因为我们的目标是稳态分布是目标分布的Markov chain，所以我们主要关注只有一个平稳分布的Markov chain。对于离散取值空间的Markov chain来说需要满足以下几个条件：
+
+1. Irreducibile：通俗来说就是从任意一个状态出发，可以到达任何其他任何状态。直观上就是说不会有一个只进不出或者只出不进的区域。
+2. Aperiodic：简单来说就是对于任意一个状态来说，在跑过足够多的预热步数之后，在每一步都有一定概率回到该状态。这一点是为了保证稳态分布的唯一性。
+
+关于这一点的证明需要用到Perron-Frobenius定理。具体的证明过程读者可以参考[这里](https://www.math.fsu.edu/~dmandel/Primers/Markov%20Chains%20and%20Stationary%20Distributions.pdf)和[这里](https://stanford.edu/class/ee363/lectures/pf.pdf)。对于连续状态空间，也有类似的证明，可以参考[这里](https://statistics.berkeley.edu/sites/default/files/tech-reports/501.pdf)（PS:我没有看懂）
+
+
+## Metropolis-Hasting算法
+
+Metropolis-Hasing算法的大意是我们有一个目标分布$p(\theta)$，此外还有一个转移概率为$q(\theta'|\theta)$的稳态Markov chain $m$。注意，目前$q(\theta'|\theta)$生成的Markov chain $m$的稳态不是$p(\theta)$。我们通过修改$m$的转移概率$q(\theta'|\theta)$生成一个新的Markov chain $m'$，使得$m'$的稳态分布就是$p(\theta)$。
+
+具体算法如下：
+ 1. 对于$X_n = \theta_i$，生成$\theta_j \sim q(\theta| \theta_i)$
+ 2. 计算接受概率(acceptance probability): $a(\theta_j|\theta_i) = \min(1, \frac{p(\theta_j)q(\theta_i|\theta_j))}{p(\theta_i)q(\theta_j|\theta_i)})$
+ 3. 以概率$a(\theta_j|\theta_i$接受新的样本$X_{n+1} = \theta_j$，否则$X_{n+1} = \theta_i$
+ 
+这里我们只证明目标分布$p(\theta)$是上面的Markov chain的稳态分布，即满足细致平衡条件(detailed balance)。
+
+$$
+\begin{aligned}
+\underbrace{a(\theta_j|\theta_i)q(\theta_j|\theta_i)}_{P(\theta_j|\theta_i)} p(\theta_i) =  & \min(1, \frac{p(\theta_j)q(\theta_i|\theta_j))}{p(\theta_i)q(\theta_j|\theta_i)})q(\theta_j|\theta_i)p(\theta_i) \\
+= & \min (q(\theta_j|\theta_i)p(\theta_i), p(\theta_j)q(\theta_i|\theta_j))) \\
+= & \min(\frac{p(\theta_i)q(\theta_j|\theta_i))}{p(\theta_j)q(\theta_i|\theta_j)}, 1)q(\theta_i|\theta_j)p(\theta_j) \\
+= & \underbrace{a(\theta_i|\theta_j)q(\theta_i|\theta_j)}_{P(\theta_j|\theta_i)} p(\theta_j)
+\end{aligned}
+$$
+其中，我们使用了符号$P(\theta_j|\theta_i)$来代表$m'$的转移概率。
+
+有几点值得注意的：
+
+1. 对于MCMC来说，对于$p(\theta)$并不需要归一化，因为只需要能够计算$p(\theta)/p(\theta')$就可以。
+2. MCMC必须要收敛到稳态分布才能提供可靠的采样样本，简单来说就是遍历了态空间。
+3. 对于MCMC来说，proposal distribution的选取对于采样效率十分重要。如果选取的不合适，会有两种可能导致采样效率过低。1）接受率很低，这会使得Markov chain在态空间里很少移动，经常停留在某些状态上；2）接受率很高，这可能是因为每次的proposal $\theta_j$都很接近$\theta_i$，也就是Markov chain每一步的步长都很短，也需要很长时间才能探索完整个态空间，达到稳态。
+
+
+上面的Metropolis-Hasting算法有一种特例：如果$q(\theta_i|\theta_j) = q(\theta_j|\theta_i)$那么上面的接受概率就简化成了$a(\theta_j|\theta_i) = \min(1, \frac{p(\theta_j)}{p(\theta_i)})$。这种特例称为Metropolis算法。我们下面的例子就是就是采用这种特殊算法。
+
+## 例子：香蕉形状后验分布
+
+这个例子来自[张成老师](https://zcrabbit.github.io/)的[Bayesian Theory and Computation](https://zcrabbit.github.io/courses/btc-s21.html)课程。考虑的是一个标准的贝叶斯模型：
+
+1. 先验(Prior)：$\theta_1 \sim \mathcal{N}(0, 1)$，$\theta_2 \sim \mathcal{N}(0, 1)$
+2. 似然函数(Likelihood): $p(y_i|\theta_1, \theta_2) \sim \mathcal{N} (\theta_1 + \theta_2^2, \sigma_y^2)$($\sigma_y=2$)
+3. 后验(Posterior): $p(\theta_1, \theta_2| y_i) \propto \exp\left(-\frac{\theta_1^2 + \theta_2^2}{2}\right) \exp\left(-\frac{\sum_i (y_i - \theta_1 -\theta_2^2)^2}{2\sigma_y^2}\right)$
+
+我们的目的是生成后验概率的采样，利有Metropolis算法，我们选取$q(\theta'|\theta) \sim \mathcal{N}(0, 0.15\mathbb{1})$。
+
+```{r, echo=FALSE}
+reticulate::use_condaenv("GluonTS")
+```
+我们先生成样本
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+from functools import partial
+from scipy.stats import multivariate_normal
+
+np.random.seed(1234)
+sigma_y = 2
+sample_size = 30
+theta1 = np.random.randn()
+theta2 = np.random.randn()
+
+print(f"Theta1: {theta1}")
+print(f"Theta2: {theta2}")
+
+y_samples = theta1 + theta2**2 + sigma_y * np.random.randn(sample_size)
+plt.plot(np.arange(sample_size), y_samples, 'o', alpha=0.5);
+plt.show()
+```
+
+下面我们写出没有归一化的后验概率
+```{python}
+def unnormalized_posterior(theta, y, sigma_y):
+    theta1 = theta[0]
+    theta2 = theta[1]
+    return 100000*np.exp(-0.5*(theta1**2 + theta2**2)) * np.exp(-0.5*np.sum((y - theta1 - theta2**2)**2) / (sigma_y**2))
+```
+上面的函数里，我们没有归一化，同时也在返回的时候乘了一个因子100000。这个并不影响采样本身，因为我们需要的是后验概率的比值，所以常数因子没有影响。之所以这么做是为了在后面可视化的时候，可以比较好的画出后验概率的contour。
+
+我们再为后面方便定义一个函数
+```{python}
+theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)
+```
+
+我们可以画出后验概率的分布
+```{python, echo=FALSE}
+theta1_2d, theta2_2d = np.meshgrid(np.linspace(-2, 2, 500), np.linspace(-2, 2, 500))
+theta1_mesh = theta1_2d.ravel()
+theta2_mesh = theta2_2d.ravel()
+
+post_mesh = np.array([theta_posterior(np.array([theta1_val, theta2_val])) for theta1_val, theta2_val in zip(theta1_mesh, theta2_mesh)])
+
+contour_df = pd.DataFrame(data={'theta1': theta1_mesh, 'theta2': theta2_mesh, 'posterior': post_mesh})
+posterior_2d = contour_df.pivot_table(index='theta1', columns='theta2', values='posterior').T.values
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues")
+plt.xlabel("theta1");
+plt.ylabel("theta2");
+plt.show()
+```
+
+我们再定义一个正太分布的类，以便后面使用。
+```{python}
+class normal_distribution:
+    def __init__(self, mu, cov):
+        self.mu = mu
+        self.cov = cov
+        
+    def pdf(self, x):
+        return multivariate_normal.pdf(x, mean=self.mu, cov=self.cov)
+    
+    def __call__(self, num_samples):
+        return multivariate_normal.rvs(mean=self.mu, cov=self.cov, size=num_samples)
+```
+
+下面我们可以定义MCMC采样类了
+```{python}
+class SimMCMCSampler:
+    def __init__(self, target_prob, delta_proposal_dist: normal_distribution):
+        self.target_prob = target_prob
+        self.delta_proposal_dist = delta_proposal_dist
+        self.step = 0
+        # self.accepted_proposal = 0
+        
+    def one_step_mc(self, current_state: np.array):
+        proposal_state = current_state + self.delta_proposal_dist(1)
+        accept_rate = np.min([1, self.target_prob(proposal_state) / self.target_prob(current_state)])
+        rand_u = np.random.rand()
+        if rand_u <= accept_rate:
+            return proposal_state, 1
+        return current_state, 0
+    
+    def run_mc(self, start_state: np.array, num_steps=1000):
+        state_shape = start_state.shape[0]
+        samples = np.zeros((num_steps+1, state_shape))
+        samples[0] = start_state
+        self.proposal_acceptance = np.zeros(num_steps)
+        for step in range(num_steps):
+            next_state, accept = self.one_step_mc(samples[step])
+            samples[step+1] = next_state
+            self.step += 1
+            # self.accepted_proposal += accept
+            self.proposal_acceptance[step] = accept
+        return samples
+```
+MCMC的主要算法就在上面的`one_step_mc`函数里了。下面我们来进行模拟采样
+```{python}
+medium_proposal_dist = normal_distribution([0, 0], [[0.15**2, 0], [0, 0.15**2]])
+medium_sampler = SimMCMCSampler(theta_posterior, medium_proposal_dist)
+medium_samples = medium_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(medium_samples[:, 0], medium_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()
+```
+
+从上面的采样结果来看，经过10000步的采样，基本得到了比较符合后验概率的结果。下面我们看看不同的proposal distribution会对采样结果有什么影响
+```{python}
+small_proposal_dist = normal_distribution([0, 0], [[0.01**2, 0], [0, 0.01**2]])
+small_sampler = SimMCMCSampler(theta_posterior, small_proposal_dist)
+small_samples = small_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(small_samples[:, 0], small_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()
+```
+
+
+```{python}
+large_proposal_dist = normal_distribution([0, 0], [[0.5**2, 0], [0, 0.5**2]])
+large_sampler = SimMCMCSampler(theta_posterior, large_proposal_dist)
+large_samples = large_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(large_samples[:, 0], large_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()
+```
+
+在上面三个采样中，不同的就是proposal distribution的方差不同。可以看到，如果proposal distribution方差过小（`small_samples`），那么Markov chain在$\theta$空间中每一步移动都很慢，采样效率很低。如果方差过大（`large_samples`），那么又会有很多的采样不被接受（参见下图）
+```{python}
+accept_df = pd.DataFrame(
+    data={'large_var': large_sampler.proposal_acceptance, 
+    'medium_var': medium_sampler.proposal_acceptance,
+    'small_var': small_sampler.proposal_acceptance}
+)
+accept_df = accept_df.assign(
+    medium_cumulative_accept_rate= accept_df.medium_var.cumsum() / np.arange(1, 10001),
+    small_cumulative_accept_rate= accept_df.small_var.cumsum() / np.arange(1, 10001),
+    large_cumulative_accept_rate= accept_df.large_var.cumsum() / np.arange(1, 10001)
+)
+
+accept_df[['small_cumulative_accept_rate', 'medium_cumulative_accept_rate', 'large_cumulative_accept_rate']].plot();
+plt.ylim(0, 1);
+plt.xlabel("Step");
+plt.ylabel("Average acceptance rate");
+plt.legend(loc="lower right");
+plt.show()
+```
+
+# 小结
+
+本文简单介绍了一种不那么需要人工设计的Monte Carlo方法，Markov chain Monte Carlo方法，还给出了算法描述以及一个简单的实现。这种算法的一个优点是几乎是半自动的，只需要一个简单的Markov chain的`proposal distribution`就可以生成我们需要的概率分布的采样。但是我们模拟结果来看，MCMC的采样效率还是和它用到的`proposal distribution`有关，如何选取以便提高采样效率是一个很需要技巧和经验的问题。在后续文章中，我们会介绍提高MCMC采样效率的方法。
