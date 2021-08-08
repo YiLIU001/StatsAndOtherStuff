@@ -184,7 +184,7 @@ class SimMCMCSampler:
             self.proposal_acceptance[step] = accept
         return samples
 ```
-MCMC的主要算法就在上面的`one_step_mc`函数里了。下面我们来进行模拟采样
+MCMC的主要算法就在上面的`one_step_mc`函数里了。下面我们来进行模拟采样。首先，我们采用一个均值为0，方差为`0.15**2`的高斯分布作为proposal distribtuion
 ```{python}
 medium_proposal_dist = normal_distribution([0, 0], [[0.15**2, 0], [0, 0.15**2]])
 medium_sampler = SimMCMCSampler(theta_posterior, medium_proposal_dist)
@@ -197,7 +197,7 @@ plt.ylim(-2.0, 2.0);
 plt.show()
 ```
 
-从上面的采样结果来看，经过10000步的采样，基本得到了比较符合后验概率的结果。下面我们看看不同的proposal distribution会对采样结果有什么影响
+从上面的采样结果来看，经过10000步的采样，基本得到了比较符合后验概率的结果。下面我们看看不同的proposal distribution会对采样结果有什么影响。先看一个方差较小的高斯分布的采样效果
 ```{python}
 small_proposal_dist = normal_distribution([0, 0], [[0.01**2, 0], [0, 0.01**2]])
 small_sampler = SimMCMCSampler(theta_posterior, small_proposal_dist)
@@ -209,8 +209,9 @@ plt.xlim(-2.0, 2.0);
 plt.ylim(-2.0, 2.0);
 plt.show()
 ```
+从上面的结果可以看到，这次采样只探索了参数空间很小的一部分，远没有收敛到稳态。
 
-
+然后是方差较大的高斯分布的采样结果
 ```{python}
 large_proposal_dist = normal_distribution([0, 0], [[0.5**2, 0], [0, 0.5**2]])
 large_sampler = SimMCMCSampler(theta_posterior, large_proposal_dist)
@@ -222,6 +223,7 @@ plt.xlim(-2.0, 2.0);
 plt.ylim(-2.0, 2.0);
 plt.show()
 ```
+从上面的结果可以看到，此时对于参数空间的探索范围比较大，但是点会稀疏一点。
 
 在上面三个采样中，不同的就是proposal distribution的方差不同。可以看到，如果proposal distribution方差过小（`small_samples`），那么Markov chain在$\theta$空间中每一步移动都很慢，采样效率很低。如果方差过大（`large_samples`），那么又会有很多的采样不被接受（参见下图）
 ```{python, echo=FALSE}
