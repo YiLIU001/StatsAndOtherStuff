@@ -1,14 +1,33 @@
 ---
-title: Monte Carlo 2
-author: R package build
+title: Monte Carlo方法 2
+author: Yi LIU
 date: '2021-07-28'
 slug: monte-carlo-2
-categories: []
-tags: []
+categories: 
+  - Work
+tags: 
+  - Bayesian
+  - Stats
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
 ---
 
 <script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
 
+<div id="TOC">
+<ul>
+<li><a href="#简介introduction">简介(Introduction)</a></li>
+<li><a href="#markov-chain">Markov chain</a></li>
+<li><a href="#metropolis-hasting算法">Metropolis-Hasting算法</a></li>
+<li><a href="#例子香蕉形状后验分布">例子：香蕉形状后验分布</a></li>
+<li><a href="#小结">小结</a></li>
+</ul>
+</div>
 
 <div id="简介introduction" class="section level2">
 <h2>简介(Introduction)</h2>
@@ -94,7 +113,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7feee27255c0&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7ff4ca10d5c0&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:
@@ -167,27 +186,10 @@ plt.xlim(-2.0, 2.0);
 plt.ylim(-2.0, 2.0);
 plt.show()</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
-<p>在上面三个采样中，不同的就是proposal distribution的方差不同。可以看到，如果proposal distribution方差过小（<code>small_samples</code>），那么Markov chain在<span class="math inline">\(\theta\)</span>空间中每一步移动都很慢，采样效率很低。如果方差过大（<code>large_samples</code>），那么又会有很多的采样不被接受（参见下图）</p>
-<pre class="python"><code>accept_df = pd.DataFrame(
-    data={&#39;large_var&#39;: large_sampler.proposal_acceptance, 
-    &#39;medium_var&#39;: medium_sampler.proposal_acceptance,
-    &#39;small_var&#39;: small_sampler.proposal_acceptance}
-)
-accept_df = accept_df.assign(
-    medium_cumulative_accept_rate= accept_df.medium_var.cumsum() / np.arange(1, 10001),
-    small_cumulative_accept_rate= accept_df.small_var.cumsum() / np.arange(1, 10001),
-    large_cumulative_accept_rate= accept_df.large_var.cumsum() / np.arange(1, 10001)
-)
-
-accept_df[[&#39;small_cumulative_accept_rate&#39;, &#39;medium_cumulative_accept_rate&#39;, &#39;large_cumulative_accept_rate&#39;]].plot();
-plt.ylim(0, 1);
-plt.xlabel(&quot;Step&quot;);
-plt.ylabel(&quot;Average acceptance rate&quot;);
-plt.legend(loc=&quot;lower right&quot;);
-plt.show()</code></pre>
-<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
+<p>在上面三个采样中，不同的就是proposal distribution的方差不同。可以看到，如果proposal distribution方差过小（<code>small_samples</code>），那么Markov chain在<span class="math inline">\(\theta\)</span>空间中每一步移动都很慢，采样效率很低。如果方差过大（<code>large_samples</code>），那么又会有很多的采样不被接受（参见下图）
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
 </div>
 <div id="小结" class="section level1">
 <h1>小结</h1>
-<p>本文简单介绍了一种不那么需要人工设计的Monte Carlo方法，Markov chain Monte Carlo方法，还给出了算法描述以及一个简单的实现。这种算法的一个优点是几乎是半自动的，只需要一个简单的Markov chain的<code>proposal distribution</code>就可以生成我们需要的概率分布的采样。但是我们模拟结果来看，MCMC的采样效率还是和它用到的<code>proposal distribution</code>有关，如何选取以便提高采样效率是一个很需要技巧和经验的问题。在后续文章中，我们会介绍提高MCMC采样效率的方法。</p>
+<p>本文简单介绍了一种不那么需要人工设计的Monte Carlo方法，Markov chain Monte Carlo方法，还给出了算法描述以及一个简单的实现。这种算法的一个优点是几乎是半自动的，只需要一个简单的Markov chain的<code>proposal distribution</code>就可以生成我们需要的概率分布的采样。但是我们模拟结果来看，MCMC的采样效率还是和它用到的<code>proposal distribution</code>有关，如何选取以便提高采样效率并平衡达到稳态的速度（或者说遍历参数空间），是一个很需要技巧和经验的问题。在后续文章中，我们会介绍提高MCMC采样效率的方法。</p>
 </div>
