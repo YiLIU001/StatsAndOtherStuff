@@ -81,7 +81,7 @@ $$
 2. 似然函数(Likelihood): $p(y_i|\theta_1, \theta_2) \sim \mathcal{N} (\theta_1 + \theta_2^2, \sigma_y^2)$($\sigma_y=2$)
 3. 后验(Posterior): $p(\theta_1, \theta_2| y_i) \propto \exp\left(-\frac{\theta_1^2 + \theta_2^2}{2}\right) \exp\left(-\frac{\sum_i (y_i - \theta_1 -\theta_2^2)^2}{2\sigma_y^2}\right)$
 
-我们的目的是生成后验概率的采样，利有Metropolis算法，我们选取$q(\theta'|\theta) \sim \mathcal{N}(0, 0.15\mathbb{1})$。
+我们的目的是生成后验概率的采样，利有Metropolis算法，我们选取$q(\theta'|\theta) \sim \mathcal{N}(0, 0.15\mathbf{1})$。
 
 ```{r, echo=FALSE}
 reticulate::use_condaenv("GluonTS")

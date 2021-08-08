@@ -80,7 +80,7 @@ link-citations: true
 <li>似然函数(Likelihood): <span class="math inline">\(p(y_i|\theta_1, \theta_2) \sim \mathcal{N} (\theta_1 + \theta_2^2, \sigma_y^2)\)</span>(<span class="math inline">\(\sigma_y=2\)</span>)</li>
 <li>后验(Posterior): <span class="math inline">\(p(\theta_1, \theta_2| y_i) \propto \exp\left(-\frac{\theta_1^2 + \theta_2^2}{2}\right) \exp\left(-\frac{\sum_i (y_i - \theta_1 -\theta_2^2)^2}{2\sigma_y^2}\right)\)</span></li>
 </ol>
-<p>我们的目的是生成后验概率的采样，利有Metropolis算法，我们选取<span class="math inline">\(q(\theta&#39;|\theta) \sim \mathcal{N}(0, 0.15\mathbb{1})\)</span>。</p>
+<p>我们的目的是生成后验概率的采样，利有Metropolis算法，我们选取<span class="math inline">\(q(\theta&#39;|\theta) \sim \mathcal{N}(0, 0.15\mathbf{1})\)</span>。</p>
 <p>我们先生成样本</p>
 <pre class="python"><code>import numpy as np
 import pandas as pd
@@ -113,7 +113,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fa4675f05c0&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f842379f5c0&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:
