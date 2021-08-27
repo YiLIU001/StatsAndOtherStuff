@@ -169,6 +169,17 @@ plt.ylim(-2.0, 2.0);
 plt.show()
 ```
 
+采样的接受率如下
+```{python, echo=FALSE}
+accept_rate_df = pd.DataFrame(data={'mala_accept': mala_sampler.accept_hist})
+accept_rate_df = accept_rate_df.assign(accept_rate_cum_mean = accept_rate_df.mala_accept.cumsum() / (accept_rate_df.index + 1))
+accept_rate_df.accept_rate_cum_mean.plot();
+# plt.ylim(0, 1);
+plt.ylabel("Cumulative mean accept rate");
+plt.show()
+```
+
+
 
 # Conclusion
 本文中我们简单介绍了一种加速MCMC采样方法收敛速度的算法MALA。这种算法的思想是利用目标分布的梯度信息来加速达到收敛的速度。后面文章中我们还会介绍别的加速MCMC收敛速度的方法。

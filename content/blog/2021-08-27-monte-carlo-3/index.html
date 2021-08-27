@@ -79,7 +79,7 @@ plt.show()</code></pre>
   
 theta_contour_calc = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>那么后验概率分布如下</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f9870716630&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7feb986f5630&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
 <p>由于MALA还需要对数概率分布的梯度，我们再定义对于上面问题的函数</p>
 <pre class="python"><code>def grad_log_posterior(q):
@@ -139,6 +139,8 @@ mala_sampler = MALASampler(posterior, sigma=0.15)
 samples = mala_sampler.sample(np.array([-0.5, 1.5]), 10000)</code></pre>
 <p>采样结果如下
 <img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<p>采样的接受率如下
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
 </div>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>
