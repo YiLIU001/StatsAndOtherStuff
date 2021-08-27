@@ -15,7 +15,7 @@ ignoreFiles:
   - \.knit\.md$
   - \.utf8\.md$
 params:
-  faviconfile: images/favicon.png
+  faviconfile: static/images/favicon.png
   highlightjs: yes
   highlightjslanguages:
     - r
