@@ -79,13 +79,13 @@ plt.show()</code></pre>
   
 theta_contour_calc = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>那么后验概率分布如下</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7feb986f5630&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f987ef09630&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
 <p>由于MALA还需要对数概率分布的梯度，我们再定义对于上面问题的函数</p>
 <pre class="python"><code>def grad_log_posterior(q):
     q1, q2 = q[0], q[1]
-    dHdq1 = q1 - np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
-    dHdq2 = q2 - 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq1 = - q1 + np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = - q2 + 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
     return np.array([dHdq1, dHdq2])</code></pre>
 <p>为了进行MALA采样，我们先定义一个后验概率的类。主要包含计算后验概率(<code>posterior</code>)和对数后验概率梯度(<code>grad_log_posterior</code>)的函数</p>
 <pre class="python"><code>class PosteriorProb:

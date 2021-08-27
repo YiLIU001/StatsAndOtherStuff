@@ -95,8 +95,8 @@ plt.show()
 ```{python}
 def grad_log_posterior(q):
     q1, q2 = q[0], q[1]
-    dHdq1 = q1 - np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
-    dHdq2 = q2 - 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq1 = - q1 + np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = - q2 + 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
     return np.array([dHdq1, dHdq2])
 ```
 
