@@ -1,0 +1,172 @@
+---
+title: Monte Carlo方法3
+author: Yi LIU
+date: '2021-08-27'
+slug: []
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+# Introduction
+
+在上一篇的文章里，我们大致解释了一下Markov chain Monte Carlo (MCMC)：使用一个`proposal distribution`$q(x|x')$作为转移概率生成一个稳态分布是目标分布的$p(x)$的Markov chain。在这个Markov chain上采样，达到稳态后的样本就可以认为是从目标分布采样的结果。之前我们使用的是一种简单的方法，Random Walk Metropolis-Hasting(RWMH)算法，这个算法十分简单，不依赖于目标分布，因此通用性也很强（也就是说同样的$q(x|x')$可以用来生成不同的$p(x)$的采样）。但是这个通用性也带来一个问题，就是采样效率（收敛到稳态分布的速度）可能没有那么高。 那么一个想法就是使用$p(x)$的信息来提高采样效率。
+
+加速采样效率的一个自然的想法是利用目标分布的信息来提高Markov chain在状态空间里的探索速度。比较简单的局部信息有梯度，下面我们介绍一种使用梯度来加速探索速度的算法Metropolis Adjusted Langevin Algorithm (MALA)。这种算法利用了Langevin diffusion的稳态分布。
+
+# MALA
+
+MALA的大致思想如下：如果$x$满足下面的扩散方程
+$$d x_t = \frac{1}{2} \nabla \log p(x) dt + dW_t$$
+其中$w_t \sim \mathcal{N}(0, 1)$，那么$x_t$随时间演化的稳态分布是$p(x)$。因此，如果我们能够根据上面的随机微分方程来演化$x_t$，那么经过足够长时间达到稳态后，我们就可以得到$p(x)$的采样。这个方程在时间上是连续的，在实际采样中，我们还需要把上面的方程离散化。但是在离散化生成每一步的样本后，还需要一步Metropolis adjustment，不然有可能无法收敛到目标分布。
+
+MALA的具体算法如下：
+
+1. 对于$x_n$，计算目标分布对数的梯度$\delta x_n = \nabla \log p(x_n)$
+2. 生成新的proposal $x_{n+1}' \sim \mathcal{N}(x_n + \frac{\sigma^2}{2} \delta x_n,  \sigma^2 \mathbf{1})$ ($\sigma$直观上是离散化之后的时间步长)
+3. 计算接受概率$a(x_{n+1}' | x_n) = \min (1, \frac{p(x_{n+1}' Q(x_n | x_{n+1}'))}{p(x_n) Q(x_{n+1}' | x_n)})$。其中$Q(x_{n+1}' | x_n) = \mathcal{N}(x_n + \frac{\sigma^2}{2} \delta x_n,  \sigma^2 \mathbf{1})$，$Q(x_n | x_{n+1}') = \mathcal{N}(x_{n+1}' + \frac{\sigma^2}{2} \delta x_{n+1}',  \sigma^2 \mathbf{1})$($\delta x_{n+1}' = \nabla \log p(x_{n+1}')$)。
+4. 以$a(x_{n+1}' | x_n)$接受新的样本$x_{n+1}'$，否则$x_{n+1} = x_n$
+
+# Implementation
+我们考虑和之前MCMC方法里一样的问题。首先生成样本
+```{r, echo=FALSE}
+library(reticulate)
+use_condaenv("GluonTS")
+```
+
+```{python, echon=FALSE}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+from functools import partial
+from scipy.stats import multivariate_normal
+
+np.random.seed(1234)
+sigma_y = 2
+sample_size = 30
+theta1 = np.random.randn()
+theta2 = np.random.randn()
+
+print(f"Theta1: {theta1}")
+print(f"Theta2: {theta2}")
+
+y_samples = theta1 + theta2**2 + sigma_y * np.random.randn(sample_size)
+plt.plot(np.arange(sample_size), y_samples, 'o', alpha=0.5);
+plt.show()
+```
+
+我们还是写出后验概率的函数
+```{python}
+def unnormalized_posterior(theta, y, sigma_y):
+    theta1 = theta[0]
+    theta2 = theta[1]
+    return 100000*np.exp(-0.5*(theta1**2 + theta2**2)) * np.exp(-0.5*np.sum((y - theta1 - theta2**2)**2) / (sigma_y**2))
+  
+theta_contour_calc = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)
+```
+那么后验概率分布如下
+```{python, echo=FALSE}
+theta1_2d, theta2_2d = np.meshgrid(np.linspace(-2, 2, 500), np.linspace(-2, 2, 500))
+theta1_mesh = theta1_2d.ravel()
+theta2_mesh = theta2_2d.ravel()
+
+post_mesh = np.array([theta_contour_calc(np.array([theta1_val, theta2_val])) for theta1_val, theta2_val in zip(theta1_mesh, theta2_mesh)])
+
+contour_df = pd.DataFrame(data={'theta1': theta1_mesh, 'theta2': theta2_mesh, 'posterior': post_mesh})
+posterior_2d = contour_df.pivot_table(index='theta1', columns='theta2', values='posterior').T.values
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues")
+plt.xlabel("theta1");
+plt.ylabel("theta2");
+plt.show()
+```
+
+由于MALA还需要对数概率分布的梯度，我们再定义对于上面问题的函数
+```{python}
+def grad_log_posterior(q):
+    q1, q2 = q[0], q[1]
+    dHdq1 = q1 - np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = q2 - 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    return np.array([dHdq1, dHdq2])
+```
+
+
+为了进行MALA采样，我们先定义一个后验概率的类。主要包含计算后验概率(`posterior`)和对数后验概率梯度(`grad_log_posterior`)的函数
+```{python}
+class PosteriorProb:
+    def __init__(self, posterior_prob, grad_log_posterior):
+        self.posterior_prob = posterior_prob
+        self.grad_log_posterior = grad_log_posterior
+        
+    def posterior(self, theta):
+        return self.posterior_prob(theta)
+    
+    def grad_log_poterior(self, theta):
+        return self.grad_log_posterior(theta)
+```
+
+下面我们可以定义采样类了
+```{python}
+class MALASampler:
+    def __init__(self, posterior_prob, sigma=0.05):
+        self.posterior_prob = posterior_prob
+        self.sigma = sigma
+        
+    def sample_one_step(self, theta_init):
+        grad_log_prob_init = self.posterior_prob.grad_log_posterior(theta_init)
+        mean_theta_init = theta_init + 0.5 * self.sigma**2 * grad_log_prob_init
+        noise_term = multivariate_normal.rvs(mean=np.zeros_like(theta_init), cov=self.sigma**2 * np.identity(theta_init.shape[0]))
+        theta_proposal = mean_theta_init + noise_term
+        grad_log_prob_proposal = self.posterior_prob.grad_log_posterior(theta_proposal)
+        mean_theta_proposal = theta_proposal + 0.5 * self.sigma**2 * grad_log_prob_proposal
+        current_tran_prob = np.exp(- 0.5 * np.sum((theta_proposal - mean_theta_init)**2) / (self.sigma**2))
+        back_tran_prob = np.exp(-0.5 * np.sum((theta_init - mean_theta_proposal)**2) / (self.sigma**2))
+        accept_rate = min(
+            1, 
+            (self.posterior_prob.posterior(theta_proposal) * back_tran_prob) / (
+                self.posterior_prob.posterior(theta_init) * current_tran_prob
+            )
+        )
+        rand_u = np.random.rand()
+        if rand_u < accept_rate:
+            return theta_proposal, 1
+        return theta_init, 0
+        
+    def sample(self, theta_init, num_samples):
+        self.accept_hist = np.zeros(num_samples)
+        state_shape = theta_init.shape[0]
+        samples = np.zeros((num_samples+1, state_shape))
+        for step in range(num_samples):
+            theta_current, accept = self.sample_one_step(samples[step])
+            samples[step+1] = theta_current
+            self.accept_hist[step] = accept
+        return samples
+```
+
+现在我们可以生成样本了
+```{python}
+posterior = PosteriorProb(theta_contour_calc, grad_log_posterior)
+mala_sampler = MALASampler(posterior, sigma=0.15)
+samples = mala_sampler.sample(np.array([-0.5, 1.5]), 10000)
+```
+
+采样结果如下
+```{python, echo=FALSE}
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(samples[:, 0], samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()
+```
+
+
