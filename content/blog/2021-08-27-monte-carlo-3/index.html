@@ -79,7 +79,7 @@ plt.show()</code></pre>
   
 theta_contour_calc = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>那么后验概率分布如下</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f987ef09630&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fea5bfb1630&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
 <p>由于MALA还需要对数概率分布的梯度，我们再定义对于上面问题的函数</p>
 <pre class="python"><code>def grad_log_posterior(q):
@@ -139,8 +139,28 @@ mala_sampler = MALASampler(posterior, sigma=0.15)
 samples = mala_sampler.sample(np.array([-0.5, 1.5]), 10000)</code></pre>
 <p>采样结果如下
 <img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-9-1.png" width="672" /></p>
+<p>我们在看看取小的方差的采样时的结果如何</p>
+<pre class="python"><code>small_sampler = MALASampler(posterior, sigma=0.01)
+small_samples = small_sampler.sample(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap=&quot;Blues&quot;);
+plt.plot(small_samples[:, 0], small_samples[:, 1], &#39;o&#39;, color=&quot;orange&quot;, alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<p>在大方差时采样结果如下</p>
+<pre class="python"><code>large_sampler = MALASampler(posterior, sigma=0.5)
+large_samples = large_sampler.sample(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap=&quot;Blues&quot;);
+plt.plot(large_samples[:, 0], large_samples[:, 1], &#39;o&#39;, color=&quot;orange&quot;, alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
 <p>采样的接受率如下
-<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-10-1.png" width="672" /></p>
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-12-1.png" width="672" /></p>
 </div>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>

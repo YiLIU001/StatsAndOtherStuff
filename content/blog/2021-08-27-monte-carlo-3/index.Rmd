@@ -169,15 +169,45 @@ plt.ylim(-2.0, 2.0);
 plt.show()
 ```
 
-采样的接受率如下
-```{python, echo=FALSE}
-accept_rate_df = pd.DataFrame(data={'mala_accept': mala_sampler.accept_hist})
-accept_rate_df = accept_rate_df.assign(accept_rate_cum_mean = accept_rate_df.mala_accept.cumsum() / (accept_rate_df.index + 1))
-accept_rate_df.accept_rate_cum_mean.plot();
-# plt.ylim(0, 1);
-plt.ylabel("Cumulative mean accept rate");
+
+我们在看看取小的方差的采样时的结果如何
+```{python}
+small_sampler = MALASampler(posterior, sigma=0.01)
+small_samples = small_sampler.sample(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(small_samples[:, 0], small_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
 plt.show()
 ```
+
+在大方差时采样结果如下
+```{python}
+large_sampler = MALASampler(posterior, sigma=0.5)
+large_samples = large_sampler.sample(np.array([-0.5, 1.5]), 10000)
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(large_samples[:, 0], large_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()
+```
+
+采样的接受率如下
+```{python, echo=FALSE}
+accept_rate_df = pd.DataFrame(data={'medium_accept': mala_sampler.accept_hist, 'small_accept': small_sampler.accept_hist, 'large_accept': large_sampler.accept_hist})
+accept_rate_df = accept_rate_df.assign(medium_cumulative_accept_rate = accept_rate_df.medium_accept.cumsum() / (accept_rate_df.index + 1),
+small_cumulative_accept_rate = accept_rate_df.small_accept.cumsum() / ( accept_rate_df.index+1),
+large_cumulative_accept_rate = accept_rate_df.large_accept.cumsum() / ( accept_rate_df.index+1))
+accept_rate_df[['small_cumulative_accept_rate', 'medium_cumulative_accept_rate', 'large_cumulative_accept_rate']].plot();
+plt.ylim(0, 1.01);
+plt.ylabel("Cumulative accept rate");
+plt.xlabel("Step");
+plt.show()
+```
+
+
 
 
 
