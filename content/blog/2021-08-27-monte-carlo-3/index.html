@@ -25,13 +25,14 @@ link-citations: true
 <li><a href="#mala">MALA</a></li>
 <li><a href="#implementation">Implementation</a></li>
 <li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#references">References</a></li>
 </ul>
 </div>
 
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <p>在上一篇的文章里，我们大致解释了一下Markov chain Monte Carlo (MCMC)：使用一个<code>proposal distribution</code><span class="math inline">\(q(x|x&#39;)\)</span>作为转移概率生成一个稳态分布是目标分布的<span class="math inline">\(p(x)\)</span>的Markov chain。在这个Markov chain上采样，达到稳态后的样本就可以认为是从目标分布采样的结果。之前我们使用的是一种简单的方法，Random Walk Metropolis-Hasting(RWMH)算法，这个算法十分简单，不依赖于目标分布，因此通用性也很强（也就是说同样的<span class="math inline">\(q(x|x&#39;)\)</span>可以用来生成不同的<span class="math inline">\(p(x)\)</span>的采样）。但是这个通用性也带来一个问题，就是采样效率（收敛到稳态分布的速度）可能没有那么高。 那么一个想法就是使用<span class="math inline">\(p(x)\)</span>的信息来提高采样效率。</p>
-<p>加速采样效率的一个自然的想法是利用目标分布的信息来提高Markov chain在状态空间里的探索速度。比较简单的局部信息有梯度，下面我们介绍一种使用梯度来加速探索速度的算法Metropolis Adjusted Langevin Algorithm (MALA)。这种算法利用了Langevin diffusion的稳态分布。</p>
+<p>加速采样效率的一个自然的想法是利用目标分布的信息来提高Markov chain在状态空间里的探索速度。比较简单的局部信息有梯度，下面我们介绍一种使用梯度来加速探索速度的算法Metropolis Adjusted Langevin Algorithm (MALA)(可参阅 <span class="citation"><a href="#ref-langevinMC" role="doc-biblioref">Xifara et al.</a> (<a href="#ref-langevinMC" role="doc-biblioref">2014</a>)</span>)。这种算法利用了Langevin diffusion的稳态分布。</p>
 </div>
 <div id="mala" class="section level1">
 <h1>MALA</h1>
@@ -79,7 +80,7 @@ plt.show()</code></pre>
   
 theta_contour_calc = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>那么后验概率分布如下</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fea5bfb1630&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fed30eed5c0&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
 <p>由于MALA还需要对数概率分布的梯度，我们再定义对于上面问题的函数</p>
 <pre class="python"><code>def grad_log_posterior(q):
@@ -165,4 +166,12 @@ plt.show()</code></pre>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>
 <p>本文中我们简单介绍了一种加速MCMC采样方法收敛速度的算法MALA。这种算法的思想是利用目标分布的梯度信息来加速达到收敛的速度。后面文章中我们还会介绍别的加速MCMC收敛速度的方法。</p>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-langevinMC" class="csl-entry">
+Xifara, Tatiana, Christopher Sherlock, Samuel Livingstone, Simon Byrne, and Mark Girolami. 2014. <span>“Langevin Diffusions and the Metropolis-Adjusted Langevin Algorithm.”</span> <em>Statistics &amp; Probability Letters</em> 91: 14–19.
+</div>
+</div>
 </div>
