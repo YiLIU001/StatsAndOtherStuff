@@ -2,7 +2,7 @@
 title: Monte Carlo方法4
 author: Yi LIU
 date: '2021-09-01'
-slug: []
+slug: monte-carlo-4
 categories:
   - Work
 tags:

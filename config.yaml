@@ -40,3 +40,6 @@ menu:
     - name: GitHub
       url: https://github.com/YiLIU001
       weight: 3
+      
+permalinks:
+  post: /:year/:month/:day/:slug/

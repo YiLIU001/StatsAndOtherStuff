@@ -2,7 +2,7 @@
 title: Monte Carlo方法 2
 author: Yi LIU
 date: '2021-07-28'
-slug: monte-carlo-2
+slug: 'monte-carlo-2'
 categories: 
   - Work
 tags: 
@@ -113,7 +113,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f8ec03f1588&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fa82671e5c0&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:
