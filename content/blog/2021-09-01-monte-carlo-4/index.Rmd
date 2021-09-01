@@ -1,0 +1,230 @@
+---
+title: Monte Carlo方法4
+author: Yi LIU
+date: '2021-09-01'
+slug: []
+categories:
+  - Work
+tags:
+  - Stats
+  - Bayesian
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+# Introduction
+
+在之前的文章里面，我们讨论了Markov chain Monte Carlo (MCMC)采样方法，这种方法在高维空间或者分布的曲率很大的时候，需要很长时间才能达到稳态分布。然后我们介绍了一种利用目标分布的梯度信息来加速收敛的方法MALA。现在我们介绍另一种可以加速收敛到稳态的采样方法：Hamiltonian Monte Carlo (HMC)。这种方法利用了Hamiltonian mechanics（哈密尔顿力学）。一篇很好的关于这种方法的入门介绍可以参阅 @ConceptHMC
+
+因为Hamiltonian mechanics里用到的广义坐标的符号通常是$q$，广义动量常用的符号是$p$，为了避免符号的混淆，后面我们把目标概率分布用$\pi$来表示，同时把参数用$q$来表示（很遗憾我们不能保持符号的一致，但是我之前是学物理的，实在很难不用$q$来表示广义坐标）。
+
+下面，我们先用一个简单的例子解释一下Hamiltonian mechanics。因为这只是给出一个满足最小背景知识需求的例子，所以只是做一些概念上的介绍。
+
+# Hamilton mechanics
+
+我们平时都接触过牛顿力学，都了解牛顿第二定律：力=质量 * 加速度（$F = ma$）。如果我们考虑一个用弹簧连接的质量为$m$的物体，在不考虑摩擦力的情况下，这个物体的运动方程是
+$$m\ddot{x}(t) = - kx(t)$$
+其中，$x(t)$是该物体在$t$时刻的位置，$k$是弹簧的弹性常数。这个系统只需要给定初始条件$x(0)$和$\dot{x}(0)$，就可以完全解出后面的动力演化。
+
+而哈密尔顿力学是以能量为主要研究对象的力学体系。在经典力学框架里，这个体系和牛顿力学体系等价。在广义坐标体系里（$q(t) \equiv x(t)$），上面提到的物体的能量，也称为哈密尔顿量(Hamiltonian)是
+$$H(p, q, t) = T(t) + V(t)$$
+其中动能是
+$$T(t) = \frac{1}{2} m \dot{x}(t)^2 = \frac{p(t)^2}{2m}, \quad (p(t) \equiv m\dot{x}(t))$$
+势能是
+$$V(t) = \frac{kq(t)^2}{2}$$
+其中$p$是物体的动量，$q$是物体的广义坐标。
+
+因为$H(p, q, t)$并不显式的包含时间，这个系统的能量是守恒的。这个系统的动力学演化是由下面的方程给出
+$$\frac{dp(t)}{dt} = -\frac{\partial H}{\partial q} \quad (\frac{dp(t)}{dt} = - kq(t))$$
+$$\frac{dq(t)}{dt} = \frac{\partial H}{\partial p} \quad (\frac{dq(t)}{dt} = \frac{p(t)}{m})$$
+上面第一个方程就是牛顿第二定律，而第二个方程就是动量$p(t)$的定义。这里可以看出哈密尔顿力学和牛顿力学是等价的。
+
+
+# Hamiltonian Monte Carlo
+
+HMC采用的方法是对于每一个参数$q$，引入一个动量$p$，再定义一个Hamiltonian
+$$H(p, q) = T(p) + V(q)$$
+其中$V(q) = - \log \pi(q)$，$T(p)=-\log \pi(p|q)$。
+
+HMC采样方法的算法如下：
+
+1. 对于$t$时刻的参数值$q_t$，利用$p_t\sim\pi(p|q_t)$来生成动量$p_t$。
+2. 根据Hamiltonian mechanics演化一段时间，得到$q_t', p_t'$
+3. 计算结束概率(acceptance probability): $a(q_t'|q_t) = min\left(1, \frac{\exp{H(-p_t', q_t')}}{\exp{H(p_t, q_t)}}\right)$
+4. 以概率$a(q_t'|q_t)$接受新的样本$q_{t+1} = q_t'$，否则$q_{t+1} = q_t$
+
+# Implementation
+```{r, echo=FALSE}
+library(reticulate)
+use_condaenv("GluonTS")
+```
+
+
+首先我们生成样本
+```{python, echon=FALSE}
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+sns.set()
+from functools import partial
+import scipy
+
+np.random.seed(1234)
+sigma_y = 2
+sample_size = 30
+theta1 = np.random.randn()
+theta2 = np.random.randn()
+
+print("Theta1:", theta1)
+print("Theta2:", theta2)
+
+y_samples = theta1 + theta2**2 + sigma_y * np.random.randn(sample_size)
+
+plt.plot(y_samples, 'o')
+```
+
+然后写出后验概率
+```{python}
+def unnormalized_posterior(theta1, theta2, y, sigma_y):
+    return 100000*np.exp(-0.5*(theta1**2 + theta2**2)) * np.exp(-0.5*np.sum((y - theta1 - theta2**2)**2) / (sigma_y**2))
+  
+theta_contour_calc = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)
+```
+
+同样画出后验概率分布
+
+```{python, echo=FALSE}
+theta1_2d, theta2_2d = np.meshgrid(np.linspace(-2, 2, 500), np.linspace(-2, 2, 500))
+theta1_mesh = theta1_2d.ravel()
+theta2_mesh = theta2_2d.ravel()
+
+post_mesh = np.array([theta_contour_calc(theta1_val, theta2_val) for theta1_val, theta2_val in zip(theta1_mesh, theta2_mesh)])
+
+contour_df = pd.DataFrame(data={'theta1': theta1_mesh, 'theta2': theta2_mesh, 'posterior': post_mesh})
+posterior_2d = contour_df.pivot_table(index='theta1', columns='theta2', values='posterior').T.values
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.xlabel("theta1");
+plt.ylabel("theta2");
+plt.show()
+```
+
+为了进行HMC采样，我们需要一个Hamiltionian的类
+```{python}
+class HamiltonianModel:
+    def __init__(self, K, V, dHdp, dHdq):
+        self.K = K
+        self.V = V
+        self.dHdq = dHdq
+        self.dHdp = dHdp
+        
+    def energy(self, p, q):
+        return self.K(p) + self.V(q)
+    
+    def dHdq(self, q):
+        return self.dHdq(q)
+    
+    def dHdp(self, p):
+        return self.dHdp(p)
+```
+上面的类主要提供了三个我们需要的函数的接口：`energy`（计算动力系统能量），`dHdq`（能量对广义坐标的导数），以及`dHdp`（能量对广义动量的导数）
+
+HMC采样的类定义如下
+```{python}
+class HMCSampler:
+    def __init__(self, model, epsilon=0.15, L_step=10):
+        self.model = model
+        self.epsilon = epsilon
+        self.L_step = L_step
+        
+    def leap_frog_one_step(self, q, p):
+        dHdq = self.model.dHdq(q)
+        p_half = p - 0.5 * self.epsilon * dHdq
+        dHdp = self.model.dHdp(p_half)
+        q_one = q + self.epsilon * dHdp
+        dHdq = self.model.dHdq(q_one)
+        p_one = p_half - 0.5 * self.epsilon * dHdq
+        return q_one, p_one
+    
+    def leap_frog(self, q, p, L_step = None):
+        if not L_step:
+            L_step = self.L_step
+        orig_q = q
+        orig_p = p
+        for _ in range(L_step):
+            q, p = self.leap_frog_one_step(q, p)
+        current_energy = self.model.energy(-p, q)
+        orig_energy = self.model.energy(orig_p, orig_q)
+        
+        accept_rate = min(np.exp(orig_energy - current_energy), 1)
+        if np.random.rand() < accept_rate:
+            return q, 1
+        else:
+            return orig_q, 0
+        
+    def propose_p(self):
+        return scipy.stats.multivariate_normal(mean=[0,0], cov=[[1,0], [0,1]]).rvs(size=1)
+        
+        
+    def sample(self, q_init, num_samples=1000):
+        self.accept_hist = np.zeros(num_samples)
+        state_shape = q_init.shape[0]
+        samples = np.zeros((num_samples+1, state_shape))
+        samples[0] = q_init
+        for step in range(num_samples):
+            p_init = self.propose_p()
+            q_current, accept = self.leap_frog(q=samples[step], p=p_init)
+            samples[step+1] = q_current
+            self.accept_hist[step] = accept
+        return samples
+```
+
+我们的模型对应的动力系统的工具函数如下
+```{python}
+def potential_energy(q):
+    q1, q2 = q[0], q[1]
+    return q1**2 / 2  + q2**2 / 2 + np.sum((y_samples - q1 - q2**2)**2) / ( 2 * sigma_y**2)
+
+def kinetic_energy(p):
+    p1, p2 = p[0], p[1]
+    return p1**2 / 2 + p2**2 / 2
+
+def dHdp(p):
+    return p
+
+def dHdq(q):
+    q1, q2 = q[0], q[1]
+    dHdq1 = q1 - np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = q2 - 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    return np.array([dHdq1, dHdq2])
+```
+
+下面我来开始采样
+```{python}
+model = HamiltonianModel(K = kinetic_energy, V = potential_energy, dHdp = dHdp, dHdq = dHdq)
+hmc_sampler = HMCSampler(model=model)
+
+samples = hmc_sampler.sample(np.array([-0.5, 1.5]), 2000)
+```
+采样结果如下
+```{python, echo=FALSE}
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.xlabel("theta1");
+plt.ylabel("theta2");
+plt.plot(samples[:, 0], samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
+plt.xlim(-2.0, 2.0);
+plt.ylim(-2.0, 2.0);
+plt.show()
+```
+
+# Conclusion
+
+本文讨论了另外一种加快MCMC收敛的方法HMC。这种方法在利用梯度信息之外还引入了辅助变量（Hamiltonian动力学里的广义动量$p$）。在后续文章里，我们会比较RWMC，MALA，和HMC的收敛速度。
+
+# References
