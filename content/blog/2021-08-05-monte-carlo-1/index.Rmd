@@ -30,6 +30,8 @@ $$\frac{1}{N} \sum_{i=1}^N h(\theta_i) \rightarrow \int_\mathcal{\Theta} h(\thet
 
 下面我们介绍几个常用的方法。秉承我们之前一系列文章的宗旨，本文并不追求理论上的严格和完备，只是介绍一个大致的框架以及展示一些简单直接的代码实现。此外，本文也并不求全，不会奢求能够把所有重要方法都介绍到。
 
+* [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
+
 
 # Importance sampling
 如果我们手头有一个分布$q(\theta)$很好采样的话，那么我们能不能利用它来近似上面的计算呢？这个想法就是importance sampling的基本思路。

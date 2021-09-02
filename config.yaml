@@ -42,4 +42,4 @@ menu:
       weight: 3
       
 permalinks:
-  post: /:year/:month/:day/:slug/
+  post: /blog/:year-:month-:day-:slug/

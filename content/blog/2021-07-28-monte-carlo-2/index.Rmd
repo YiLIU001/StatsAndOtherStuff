@@ -2,7 +2,7 @@
 title: Monte Carlo方法 2
 author: Yi LIU
 date: '2021-07-28'
-slug: 'monte-carlo-2'
+slug: monte-carlo-2
 categories: 
   - Work
 tags: 
