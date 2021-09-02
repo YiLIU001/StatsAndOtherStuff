@@ -73,6 +73,9 @@ $$
 
 上面的Metropolis-Hasting算法有一种特例：如果$q(\theta_i|\theta_j) = q(\theta_j|\theta_i)$那么上面的接受概率就简化成了$a(\theta_j|\theta_i) = \min(1, \frac{p(\theta_j)}{p(\theta_i)})$。这种特例称为Metropolis算法。我们下面的例子就是就是采用这种特殊算法。
 
+# Random walk MCMC
+如果我们使用的转移概率是一个高斯分布，那么这种算法就叫做Random Walk MCMC。下面我们给出一个例子。
+
 ## 例子：香蕉形状后验分布
 
 这个例子来自[张成老师](https://zcrabbit.github.io/)的[Bayesian Theory and Computation](https://zcrabbit.github.io/courses/btc-s21.html)课程。考虑的是一个标准的贝叶斯模型：

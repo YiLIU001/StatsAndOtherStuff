@@ -24,7 +24,10 @@ link-citations: true
 <li><a href="#简介introduction">简介(Introduction)</a></li>
 <li><a href="#markov-chain">Markov chain</a></li>
 <li><a href="#metropolis-hasting算法">Metropolis-Hasting算法</a></li>
+<li><a href="#random-walk-mcmc">Random walk MCMC</a>
+<ul>
 <li><a href="#例子香蕉形状后验分布">例子：香蕉形状后验分布</a></li>
+</ul></li>
 <li><a href="#小结">小结</a></li>
 </ul>
 </div>
@@ -72,6 +75,9 @@ link-citations: true
 </ol>
 <p>上面的Metropolis-Hasting算法有一种特例：如果<span class="math inline">\(q(\theta_i|\theta_j) = q(\theta_j|\theta_i)\)</span>那么上面的接受概率就简化成了<span class="math inline">\(a(\theta_j|\theta_i) = \min(1, \frac{p(\theta_j)}{p(\theta_i)})\)</span>。这种特例称为Metropolis算法。我们下面的例子就是就是采用这种特殊算法。</p>
 </div>
+<div id="random-walk-mcmc" class="section level1">
+<h1>Random walk MCMC</h1>
+<p>如果我们使用的转移概率是一个高斯分布，那么这种算法就叫做Random Walk MCMC。下面我们给出一个例子。</p>
 <div id="例子香蕉形状后验分布" class="section level2">
 <h2>例子：香蕉形状后验分布</h2>
 <p>这个例子来自<a href="https://zcrabbit.github.io/">张成老师</a>的<a href="https://zcrabbit.github.io/courses/btc-s21.html">Bayesian Theory and Computation</a>课程。考虑的是一个标准的贝叶斯模型：</p>
@@ -113,7 +119,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fbfea34d630&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f89bef17630&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:
@@ -191,6 +197,7 @@ plt.show()</code></pre>
 从上面的结果可以看到，此时对于参数空间的探索范围比较大，但是点会稀疏一点。</p>
 <p>在上面三个采样中，不同的就是proposal distribution的方差不同。可以看到，如果proposal distribution方差过小（<code>small_samples</code>），那么Markov chain在<span class="math inline">\(\theta\)</span>空间中每一步移动都很慢，采样效率很低。如果方差过大（<code>large_samples</code>），那么又会有很多的采样不被接受（参见下图）
 <img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-11-1.png" width="672" /></p>
+</div>
 </div>
 <div id="小结" class="section level1">
 <h1>小结</h1>
