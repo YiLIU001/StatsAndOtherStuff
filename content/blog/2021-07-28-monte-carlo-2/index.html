@@ -21,9 +21,11 @@ link-citations: true
 
 <div id="TOC">
 <ul>
-<li><a href="#简介introduction">简介(Introduction)</a></li>
+<li><a href="#introduction">Introduction</a>
+<ul>
 <li><a href="#markov-chain">Markov chain</a></li>
 <li><a href="#metropolis-hasting算法">Metropolis-Hasting算法</a></li>
+</ul></li>
 <li><a href="#random-walk-mcmc">Random walk MCMC</a>
 <ul>
 <li><a href="#例子香蕉形状后验分布">例子：香蕉形状后验分布</a></li>
@@ -32,12 +34,17 @@ link-citations: true
 </ul>
 </div>
 
-<div id="简介introduction" class="section level2">
-<h2>简介(Introduction)</h2>
+<p>本系列其它文章：</p>
+<ul>
+<li><a href="/blog/monte-carlo-1">Importance sampling</a></li>
+<li><a href="/blog/2021-08-27-monte-carlo-3">Metroplis Adaptive Langevin Algorithm</a></li>
+<li><a href="/blog/2021-09-01-monte-carlo-4">Hamiltonian Monte Carlo</a></li>
+</ul>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
 <p>在Importance Sampling (IS)中，一个对于采样效率和采样结果可靠性的很重要的因素是如何选取替代分布概率<span class="math inline">\(q(\theta)\)</span>。这其中有很多因素需要考虑，比如<span class="math inline">\(q(\theta)\)</span>的取值范围是否涵盖了我们的目标概率分布<span class="math inline">\(p(\theta)\)</span>的取值范围，怎样可以使得采样的方差比较小。这些需要大量的关于<span class="math inline">\(p(\theta)\)</span>的知识和经验才能设计出合适的<span class="math inline">\(q(\theta)\)</span>。</p>
 <p>那么有没有一种采样方法能减少这个选取过程中的工作量呢？答案是有的。下面我们就介绍这样一种方法：Markov Chain Monte Carlo (MCMC)。MCMC的基本想法是如果我们有一条Markov chain，如果它的稳态分布(stationary distribution)就是我们的目标分布，那么我们从这条Markov chain上生产足够多的达到稳态后的样本，那么我们就得到了目标函数的采样。</p>
 <p>那么现在的问题是：怎样生成一条问题分布是目标分布的Markov chain？因为Markov chain的稳态分布完全由转移概率(transition probability)决定，那么这也就等价于设计Markov chain的转移概率分布，使得Markov chain的稳态分布就是我们的目标分布。幸运的是，这个问题可以用一个比较通用的算法解决。在介绍这个算法之前，我们先简单介绍一下Markov chain。</p>
-</div>
 <div id="markov-chain" class="section level2">
 <h2>Markov chain</h2>
 <p>Markov chain是一种随机过程，包含了一系列随机变量<span class="math inline">\(\Theta_1, \Theta_2, \dots\)</span>，它们满足如下关系：</p>
@@ -74,6 +81,7 @@ link-citations: true
 <li>对于MCMC来说，proposal distribution的选取对于采样效率十分重要。如果选取的不合适，会有两种可能导致采样效率过低。1）接受率很低，这会使得Markov chain在态空间里很少移动，经常停留在某些状态上；2）接受率很高，这可能是因为每次的proposal <span class="math inline">\(\theta_j\)</span>都很接近<span class="math inline">\(\theta_i\)</span>，也就是Markov chain每一步的步长都很短，也需要很长时间才能探索完整个态空间，达到稳态。</li>
 </ol>
 <p>上面的Metropolis-Hasting算法有一种特例：如果<span class="math inline">\(q(\theta_i|\theta_j) = q(\theta_j|\theta_i)\)</span>那么上面的接受概率就简化成了<span class="math inline">\(a(\theta_j|\theta_i) = \min(1, \frac{p(\theta_j)}{p(\theta_i)})\)</span>。这种特例称为Metropolis算法。我们下面的例子就是就是采用这种特殊算法。</p>
+</div>
 </div>
 <div id="random-walk-mcmc" class="section level1">
 <h1>Random walk MCMC</h1>
@@ -119,7 +127,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f89bef17630&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fa39f8cc630&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:

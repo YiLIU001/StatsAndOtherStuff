@@ -17,6 +17,12 @@ biblio-style: "apalike"
 link-citations: true
 ---
 
+本系列其它文章：
+
+* [Importance sampling](/blog/monte-carlo-1)
+* [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
+* [Metroplis Adaptive Langevin Algorithm](/blog/2021-08-27-monte-carlo-3)
+
 # Introduction
 
 在之前的文章里面，我们讨论了Markov chain Monte Carlo (MCMC)采样方法，这种方法在高维空间或者分布的曲率很大的时候，需要很长时间才能达到稳态分布。然后我们介绍了一种利用目标分布的梯度信息来加速收敛的方法MALA。现在我们介绍另一种可以加速收敛到稳态的采样方法：Hamiltonian Monte Carlo (HMC)。这种方法利用了Hamiltonian mechanics（哈密尔顿力学）。一篇很好的关于这种方法的入门介绍可以参阅 @ConceptHMC

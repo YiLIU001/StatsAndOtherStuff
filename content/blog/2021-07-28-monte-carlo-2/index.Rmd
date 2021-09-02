@@ -17,7 +17,15 @@ biblio-style: "apalike"
 link-citations: true
 ---
 
-## 简介(Introduction)
+本系列其它文章：
+
+* [Importance sampling](/blog/monte-carlo-1)
+* [Metroplis Adaptive Langevin Algorithm](/blog/2021-08-27-monte-carlo-3)
+* [Hamiltonian Monte Carlo](/blog/2021-09-01-monte-carlo-4)
+
+
+
+# Introduction
 
 在Importance Sampling (IS)中，一个对于采样效率和采样结果可靠性的很重要的因素是如何选取替代分布概率$q(\theta)$。这其中有很多因素需要考虑，比如$q(\theta)$的取值范围是否涵盖了我们的目标概率分布$p(\theta)$的取值范围，怎样可以使得采样的方差比较小。这些需要大量的关于$p(\theta)$的知识和经验才能设计出合适的$q(\theta)$。
 

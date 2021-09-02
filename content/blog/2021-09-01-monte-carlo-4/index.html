@@ -2,7 +2,7 @@
 title: Monte Carlo方法4
 author: Yi LIU
 date: '2021-09-01'
-slug: []
+slug: monte-carlo-4
 categories:
   - Work
 tags:
@@ -30,6 +30,12 @@ link-citations: true
 </ul>
 </div>
 
+<p>本系列其它文章：</p>
+<ul>
+<li><a href="/blog/monte-carlo-1">Importance sampling</a></li>
+<li><a href="/blog/monte-carlo-2">Random walk Markov chain Monte Carlo</a></li>
+<li><a href="/blog/2021-08-27-monte-carlo-3">Metroplis Adaptive Langevin Algorithm</a></li>
+</ul>
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <p>在之前的文章里面，我们讨论了Markov chain Monte Carlo (MCMC)采样方法，这种方法在高维空间或者分布的曲率很大的时候，需要很长时间才能达到稳态分布。然后我们介绍了一种利用目标分布的梯度信息来加速收敛的方法MALA。现在我们介绍另一种可以加速收敛到稳态的采样方法：Hamiltonian Monte Carlo (HMC)。这种方法利用了Hamiltonian mechanics（哈密尔顿力学）。一篇很好的关于这种方法的入门介绍可以参阅 <span class="citation"><a href="#ref-ConceptHMC" role="doc-biblioref">Betancourt</a> (<a href="#ref-ConceptHMC" role="doc-biblioref">2017</a>)</span></p>

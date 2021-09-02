@@ -17,6 +17,14 @@ biblio-style: "apalike"
 link-citations: true
 ---
 
+
+本系列其它文章：
+
+* [Importance sampling](/blog/monte-carlo-1)
+* [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
+* [Hamiltonian Monte Carlo](/blog/2021-09-01-monte-carlo-4)
+
+
 # Introduction
 
 在上一篇的文章里，我们大致解释了一下Markov chain Monte Carlo (MCMC)：使用一个`proposal distribution`$q(x|x')$作为转移概率生成一个稳态分布是目标分布的$p(x)$的Markov chain。在这个Markov chain上采样，达到稳态后的样本就可以认为是从目标分布采样的结果。之前我们使用的是一种简单的方法，Random Walk Metropolis-Hasting(RWMH)算法，这个算法十分简单，不依赖于目标分布，因此通用性也很强（也就是说同样的$q(x|x')$可以用来生成不同的$p(x)$的采样）。但是这个通用性也带来一个问题，就是采样效率（收敛到稳态分布的速度）可能没有那么高。 那么一个想法就是使用$p(x)$的信息来提高采样效率。
