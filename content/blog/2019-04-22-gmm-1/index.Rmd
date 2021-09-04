@@ -16,6 +16,16 @@ description: First article on Gaussian Mixture Model
 
 这里我们介绍一种聚类方法，高斯混合模型(Gaussian mixture model)。（这里要和mixed model区分开来，mixed model是一种统计模型，主要用来处理重复测量，或者有群组效应的数据，可以认为是一种监督学习方法）。高斯混合模型是一种基于模型的聚类方法，它是混合模型的一种特例，因为它只考虑高斯分布的混合。它和另一种常见的聚类方法K-Means有很多相似性。从某种程度上来说，K-Means是高斯混合模型的一种特殊情况。能使用K-Means的问题就能使用高斯混合模型，比如图像压缩中使用的矢量量化（vector quantization，参见Elements of statistical learning, Chap 14）。除此之外，高斯混合模型还可以用来做异常检测。
 
+本文是一系列文章中的第一篇。其它文章如下：
+
+* [高斯混合模型2](/blog/2010-04-27-gmm-2)
+* [高斯混合模型3](/blog/3)
+* [高斯混合模型4](/blog/4)
+* [高斯混合模型5](/blog/5)
+* [高斯混合模型6](/blog/6)
+* [高斯混合模型7](/blog/7)
+
+
 
 # 模型定义
 具体模型如下：我们有一批数据$\{x_i\}, i=1,\dots, n$,其中每个数据都是独立服从一个混合高斯分布。即

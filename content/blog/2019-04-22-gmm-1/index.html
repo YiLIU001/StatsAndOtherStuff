@@ -18,6 +18,15 @@ description: First article on Gaussian Mixture Model
 <h1>简介</h1>
 <p>机器学习可以分成三个子领域：监督学习，无监督学习和强化学习。无监督学习可以看成是“没有老师情况下的学习”，因为只有数据本身，没有监督学习里的标签，也没有强化学习里的反馈。</p>
 <p>这里我们介绍一种聚类方法，高斯混合模型(Gaussian mixture model)。（这里要和mixed model区分开来，mixed model是一种统计模型，主要用来处理重复测量，或者有群组效应的数据，可以认为是一种监督学习方法）。高斯混合模型是一种基于模型的聚类方法，它是混合模型的一种特例，因为它只考虑高斯分布的混合。它和另一种常见的聚类方法K-Means有很多相似性。从某种程度上来说，K-Means是高斯混合模型的一种特殊情况。能使用K-Means的问题就能使用高斯混合模型，比如图像压缩中使用的矢量量化（vector quantization，参见Elements of statistical learning, Chap 14）。除此之外，高斯混合模型还可以用来做异常检测。</p>
+<p>本文是一系列文章中的第一篇。其它文章如下：</p>
+<ul>
+<li><a href="/blog/2010-04-27-gmm-2">高斯混合模型2</a></li>
+<li><a href="/blog/3">高斯混合模型3</a></li>
+<li><a href="/blog/4">高斯混合模型4</a></li>
+<li><a href="/blog/5">高斯混合模型5</a></li>
+<li><a href="/blog/6">高斯混合模型6</a></li>
+<li><a href="/blog/7">高斯混合模型7</a></li>
+</ul>
 </div>
 <div id="模型定义" class="section level1">
 <h1>模型定义</h1>
@@ -87,12 +96,12 @@ print(paste(&quot;Simple imp result:&quot;, res1))</code></pre>
 microbenchmark(loglik(c(-2,2), x),
                loglik_vec(c(-2,2), x))</code></pre>
 <pre><code>## Unit: microseconds
-##                     expr       min        lq      mean    median        uq
-##      loglik(c(-2, 2), x) 21195.820 34226.755 37638.901 37382.622 40354.796
-##  loglik_vec(c(-2, 2), x)   378.187   614.683   831.227   644.397   707.368
-##       max neval
-##  66105.91   100
-##  15757.73   100</code></pre>
+##                     expr       min         lq       mean    median         uq
+##      loglik(c(-2, 2), x) 14312.885 21879.7455 32362.8929 29398.961 36030.0790
+##  loglik_vec(c(-2, 2), x)   351.198   410.0915   824.5796   578.715   666.1935
+##        max neval
+##  118973.72   100
+##   10507.28   100</code></pre>
 <p>所以我们使用第二种矢量化的函数。</p>
 <p>下面我们看看这个对数似然函数的样貌(landscape)。
 <img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="672" />
