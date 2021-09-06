@@ -20,8 +20,8 @@ link-citations: true
 本系列其它文章：
 
 * [Importance sampling](/blog/monte-carlo-1)
-* [Metroplis Adaptive Langevin Algorithm](/blog/2021-08-27-monte-carlo-3)
-* [Hamiltonian Monte Carlo](/blog/2021-09-01-monte-carlo-4)
+* [Metroplis Adaptive Langevin Algorithm](/blog/monte-carlo-3)
+* [Hamiltonian Monte Carlo](/blog/monte-carlo-4)
 
 
 
