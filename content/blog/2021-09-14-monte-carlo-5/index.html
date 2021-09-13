@@ -1,0 +1,184 @@
+---
+title: Monte Carlo方法5
+author: Yi LIU
+date: '2021-09-14'
+slug: monte-carlo-5
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#comparison">Comparison</a>
+<ul>
+<li><a href="#达到高概率区域速度">达到高概率区域速度</a></li>
+<li><a href="#收敛速度">收敛速度</a></li>
+</ul></li>
+<li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</div>
+
+<p>本系列其它文章：</p>
+<ul>
+<li><a href="/blog/monte-carlo-1">Importance sampling</a></li>
+<li><a href="/blog/monte-carlo-2">Random walk Markov chain Monte Carlo</a></li>
+<li><a href="/blog/monte-carlo-3">Metroplis Adaptive Langevin Algorithm</a></li>
+<li><a href="/blog/monte-carlo-4">Hamiltonian Monte Carlo</a></li>
+</ul>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>本文通过之前几篇文章的例子来简单比较一下MCMC算法。依照惯例，我们先生成样本</p>
+<pre class="python"><code>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+from functools import partial
+import scipy
+from scipy.stats import multivariate_normal
+
+np.random.seed(1234)
+sigma_y = 2
+sample_size = 30
+theta1 = np.random.randn()
+theta2 = np.random.randn()
+
+print(f&quot;Theta1: {theta1}&quot;)
+## Theta1: 0.47143516373249306</code></pre>
+<pre><code>## Theta1: 0.47143516373249306</code></pre>
+<pre class="python"><code>print(f&quot;Theta2: {theta2}&quot;)
+## Theta2: -1.1909756947064645</code></pre>
+<pre><code>## Theta2: -1.1909756947064645</code></pre>
+<pre class="python"><code>y_samples = theta1 + theta2**2 + sigma_y * np.random.randn(sample_size)
+plt.plot(np.arange(sample_size), y_samples, &#39;o&#39;, alpha=0.5);
+plt.show()</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-2-1.png" width="672" /></p>
+<p>下面画出后验概率
+<img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-3-1.png" width="672" /></p>
+</div>
+<div id="comparison" class="section level1">
+<h1>Comparison</h1>
+<div id="达到高概率区域速度" class="section level2">
+<h2>达到高概率区域速度</h2>
+<pre class="python"><code># RWMH
+rw_proposal_dist = normal_distribution([0, 0], [[0.15**2, 0], [0, 0.15**2]])
+rwmh_sampler = SimMCMCSampler(theta_posterior, rw_proposal_dist)
+
+# MALA
+posterior = PosteriorProb(theta_posterior, grad_log_posterior)
+mala_sampler = MALASampler(posterior, sigma=0.15)
+
+# HMC
+def potential_energy(q):
+    q1, q2 = q[0], q[1]
+    return q1**2 / 2  + q2**2 / 2 + np.sum((y_samples - q1 - q2**2)**2) / ( 2 * sigma_y**2)
+
+def kinetic_energy(p):
+    p1, p2 = p[0], p[1]
+    return p1**2 / 2 + p2**2 / 2
+
+def dHdp(p):
+    return p
+
+def dHdq(q):
+    q1, q2 = q[0], q[1]
+    dHdq1 = q1 - np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = q2 - 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    return np.array([dHdq1, dHdq2])
+  
+model = HamiltonianModel(K = kinetic_energy, V = potential_energy, dHdp = dHdp, dHdq = dHdq)
+hmc_sampler = HMCSampler(model=model)</code></pre>
+<pre class="python"><code>start_point = np.array([-0.5, 0.0])
+rw_samples = rwmh_sampler.sample(start_point, num_samples = 100)
+mala_samples = mala_sampler.sample(start_point, num_samples = 100)
+hmc_samples = hmc_sampler.sample(start_point, num_samples = 10)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<p>上面的采样中，HMC只采了10个样本，这是因为每次采样都进行了10次frog leap。所以10次也约等于其它两个采样算法的100步。从上面的结果中，我们可以看到:</p>
+<ol style="list-style-type: decimal">
+<li>RWMH达到高概率区域的时间最久，探索高概率区域的范围也最小。</li>
+<li>MALA算法达到高概率区域的时间花费第二，探索高概率区域的范围也主要集中在下方。</li>
+<li>HMC算法达到高概率区域的时间花费最短，探索高概率区域的范围也很大。</li>
+</ol>
+</div>
+<div id="收敛速度" class="section level2">
+<h2>收敛速度</h2>
+<p>下面我们来比较一下三种算法的收敛速度。为了验证是否达到收敛，通常的做法是多选取几个起始点，分别生成Markov chain，然后计算组间方差及组内方差，并计算一个统计量<span class="math inline">\(\hat{R}\)</span>。如果<span class="math inline">\(\hat{R}\)</span>接近1，那么就收敛了，不然就没有收敛(通常接近1的阈值选取1.1)。这个统计量的意义大致上是估计多个采样结果总和之后的分布方差和单个采样结果的分布方差的比值的平方根，具体的解释请参阅 <span class="citation"><a href="#ref-gelman2013bayesian" role="doc-biblioref">Gelman et al.</a> (<a href="#ref-gelman2013bayesian" role="doc-biblioref">2013</a>)</span></p>
+<p>下面我们写一个函数来计算这个统计量</p>
+<pre class="python"><code>def compute_Rhat(sampler, init_points, num_samples):
+    m = len(init_points) # number of chains
+    n = num_samples
+    samples = [sampler.sample(init_point, num_samples) for init_point in init_points]
+  
+    total_sample_dfs = pd.concat([pd.DataFrame({&#39;sample_ind&#39;: ind, &#39;theta1&#39;: sample[:, 0], &#39;theta2&#39;: sample[:, 1], &#39;insample_ind&#39;: np.arange(n+1)}) for ind, sample in enumerate(samples)])
+  
+    total_sample_dfs_sub = total_sample_dfs.loc[total_sample_dfs.insample_ind &gt;= (n/2)]
+    in_sample_mean = total_sample_dfs_sub.groupby(&#39;sample_ind&#39;)[[&#39;theta1&#39;, &#39;theta2&#39;]].mean()
+    total_sample_mean = total_sample_dfs_sub[[&#39;theta1&#39;, &#39;theta2&#39;]].mean()
+    
+    n = int(n / 2)
+    B = n / (m - 1) * np.sum((in_sample_mean - total_sample_mean)**2, axis=0)
+    
+    in_sample_var = total_sample_dfs_sub.groupby(&#39;sample_ind&#39;)[[&#39;theta1&#39;, &#39;theta2&#39;]].var()
+    
+    W = in_sample_var.mean(axis=0)
+    
+    varPsi =  (n-1) /n * W + B / n
+    return np.sqrt(varPsi / W), total_sample_dfs</code></pre>
+<p>那么我们可以看一下相同情况下不同MCMC方法的<span class="math inline">\(\hat{R}\)</span>是怎么样的</p>
+<pre class="python"><code>init_points = [np.array([-0.5, 0.0]), np.array([-0.5, 1.5]), np.array([-0.5, -1.5]),
+              np.array([0.0, 0.0]), np.array([0.0, 1.5]), np.array([0.0, -1.5]),
+              np.array([-2, 0.0]), np.array([-2, 1.5]), np.array([-2, -1.5])]
+              
+np.random.seed(1234)
+Rhat_rwmh, rwmh_samples = compute_Rhat(rwmh_sampler, init_points, 2000)
+Rhat_mala, mala_samples = compute_Rhat(mala_sampler, init_points, 2000)
+Rhat_hmc, hmc_samples = compute_Rhat(hmc_sampler, init_points, 200)
+
+print(f&quot;Rhat of rwmh: {Rhat_rwmh}&quot;)</code></pre>
+<pre><code>## Rhat of rwmh: theta1    1.029836
+## theta2    1.179542
+## dtype: float64</code></pre>
+<pre class="python"><code>print(f&quot;Rhat of mala: {Rhat_mala}&quot;)</code></pre>
+<pre><code>## Rhat of mala: theta1    1.088747
+## theta2    1.251156
+## dtype: float64</code></pre>
+<pre class="python"><code>print(f&quot;Rhat of hmc: {Rhat_hmc}&quot;)</code></pre>
+<pre><code>## Rhat of hmc: theta1    1.004849
+## theta2    1.033377
+## dtype: float64</code></pre>
+<p>从上面的结果可以看出，对于<span class="math inline">\(\theta_1\)</span>来说，三种采样方法基本都达到了收敛。而对于<span class="math inline">\(\theta_2\)</span>来说，只有HMC采样方法收敛。</p>
+</div>
+</div>
+<div id="conclusion" class="section level1">
+<h1>Conclusion</h1>
+<p>本文比较了一下前面介绍的三种MCMC采样方法，从到达高概率区域的速度和收敛速度方面进行了初步的比较。在香蕉型分布的例子上，HMC在收敛速度上是有优势的。</p>
+<p>本文也是介绍Monte Carlo方法系列文章的最后一篇。在这个系列里，对于这些算法所做的介绍都是关注于最基本的形式，有很多改进的方法都没有涉及。这么做的目的主要是想给大家一个直观的解释，同时希望能通过简单的代码，展示一下算法的基本实现方法。下面对于几个算法再做点简单的评论</p>
+<ol style="list-style-type: decimal">
+<li>对于MCMC类型的算法来说，每一次提出的新的样本都有一定的概率被介绍。但是并不是这个接受的概率越高越好。因为如果每一次提出的新样本很之前的样本十分接近，那么接受概率自然就高，但是这样在参数空间里探索的速度就会很慢，同样需要很久才能达到收敛。通常来说，采样的平均接受概率在60%-70%之间比较合适。</li>
+<li>之前介绍的RWMH和MALA算法里，每一次的转移概率的方差（也可以认为是步长）都是固定的，那么有没有可能采用自适应（self-adaptive）的步长呢？感兴趣的读者可以自己去思考一下这个问题。</li>
+<li>对于HMC里的动能项<span class="math inline">\(T\)</span>，我们同样采取了常数的质量。那么和上面一点同样的，我们也可以思考如何采样自适应的质量来提高采样效率。</li>
+</ol>
+<p>本系列文章后面采用了<code>python</code>语言，这是因为我想利用面向对象编程的封装，不要传递太多参数，让代码看起来简洁一点。而我又不会<code>R</code>的面向对象编程，所以只好换成了<code>python</code>语言。但是我想这两种语言的语法都不难，读起来应该是没有障碍的。还请大家原谅。</p>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-gelman2013bayesian" class="csl-entry">
+Gelman, A., J. B. Carlin, H. S. Stern, D. B. Dunson, A. Vehtari, and D. B. Rubin. 2013. <em>Bayesian Data Analysis, Third Edition</em>. Chapman &amp; Hall/CRC Texts in Statistical Science. Taylor &amp; Francis.
+</div>
+</div>
+</div>

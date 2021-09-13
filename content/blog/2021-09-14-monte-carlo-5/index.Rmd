@@ -1,0 +1,359 @@
+---
+title: Monte Carlo方法5
+author: Yi LIU
+date: '2021-09-14'
+slug: monte-carlo-5
+categories:
+  - Work
+tags:
+  - Bayesian
+  - Stats
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citations: true
+---
+
+
+本系列其它文章：
+
+* [Importance sampling](/blog/monte-carlo-1)
+* [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
+* [Metroplis Adaptive Langevin Algorithm](/blog/monte-carlo-3)
+* [Hamiltonian Monte Carlo](/blog/monte-carlo-4)
+
+# Introduction
+```{r, echo=FALSE}
+library(reticulate)
+reticulate::use_condaenv("GluonTS")
+```
+本文通过之前几篇文章的例子来简单比较一下MCMC算法。依照惯例，我们先生成样本
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+from functools import partial
+import scipy
+from scipy.stats import multivariate_normal
+
+np.random.seed(1234)
+sigma_y = 2
+sample_size = 30
+theta1 = np.random.randn()
+theta2 = np.random.randn()
+
+print(f"Theta1: {theta1}")
+## Theta1: 0.47143516373249306
+print(f"Theta2: {theta2}")
+## Theta2: -1.1909756947064645
+y_samples = theta1 + theta2**2 + sigma_y * np.random.randn(sample_size)
+plt.plot(np.arange(sample_size), y_samples, 'o', alpha=0.5);
+plt.show()
+```
+
+下面画出后验概率
+```{python, echo=FALSE}
+def unnormalized_posterior(theta, y, sigma_y):
+    theta1 = theta[0]
+    theta2 = theta[1]
+    return 100000*np.exp(-0.5*(theta1**2 + theta2**2)) * np.exp(-0.5*np.sum((y - theta1 - theta2**2)**2) / (sigma_y**2))
+  
+theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)
+
+theta1_2d, theta2_2d = np.meshgrid(np.linspace(-2, 2, 500), np.linspace(-2, 2, 500))
+theta1_mesh = theta1_2d.ravel()
+theta2_mesh = theta2_2d.ravel()
+
+post_mesh = np.array([theta_posterior(theta_val) for theta_val in zip(theta1_mesh, theta2_mesh)])
+
+contour_df = pd.DataFrame(data={'theta1': theta1_mesh, 'theta2': theta2_mesh, 'posterior': post_mesh})
+posterior_2d = contour_df.pivot_table(index='theta1', columns='theta2', values='posterior').T.values
+
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.xlabel("theta1");
+plt.ylabel("theta2");
+plt.show()
+```
+
+
+# Comparison
+## 达到高概率区域速度
+```{python RWMH, echo=FALSE}
+class normal_distribution:
+    def __init__(self, mu, cov):
+        self.mu = mu
+        self.cov = cov
+        
+    def pdf(self, x):
+        return multivariate_normal.pdf(x, mean=self.mu, cov=self.cov)
+    
+    def __call__(self, num_samples):
+        return multivariate_normal.rvs(mean=self.mu, cov=self.cov, size=num_samples)
+      
+class SimMCMCSampler:
+    def __init__(self, target_prob, delta_proposal_dist: normal_distribution):
+        self.target_prob = target_prob
+        self.delta_proposal_dist = delta_proposal_dist
+        self.step = 0
+        # self.accepted_proposal = 0
+        
+    def one_step_mc(self, current_state: np.array):
+        proposal_state = current_state + self.delta_proposal_dist(1)
+        accept_rate = np.min([1, self.target_prob(proposal_state) / self.target_prob(current_state)])
+        rand_u = np.random.rand()
+        if rand_u <= accept_rate:
+            return proposal_state, 1
+        return current_state, 0
+    
+    def sample(self, start_state: np.array, num_samples=1000):
+        state_shape = start_state.shape[0]
+        samples = np.zeros((num_samples+1, state_shape))
+        samples[0] = start_state
+        self.proposal_acceptance = np.zeros(num_samples)
+        for step in range(num_samples):
+            next_state, accept = self.one_step_mc(samples[step])
+            samples[step+1] = next_state
+            self.step += 1
+            # self.accepted_proposal += accept
+            self.proposal_acceptance[step] = accept
+        return samples
+```
+
+```{python MALA, echo=FALSE}
+def grad_log_posterior(q):
+    q1, q2 = q[0], q[1]
+    dHdq1 = - q1 + np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = - q2 + 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    return np.array([dHdq1, dHdq2])
+
+class PosteriorProb:
+    def __init__(self, posterior_prob, grad_log_posterior):
+        self.posterior_prob = posterior_prob
+        self.grad_log_posterior = grad_log_posterior
+        
+    def posterior(self, theta):
+        return self.posterior_prob(theta)
+    
+    def grad_log_poterior(self, theta):
+        return self.grad_log_posterior(theta)
+      
+class MALASampler:
+    def __init__(self, posterior_prob, sigma=0.05):
+        self.posterior_prob = posterior_prob
+        self.sigma = sigma
+        
+    def sample_one_step(self, theta_init):
+        grad_log_prob_init = self.posterior_prob.grad_log_posterior(theta_init)
+        mean_theta_init = theta_init + 0.5 * self.sigma**2 * grad_log_prob_init
+        noise_term = multivariate_normal.rvs(mean=np.zeros_like(theta_init), cov=self.sigma**2 * np.identity(theta_init.shape[0]))
+        theta_proposal = mean_theta_init + noise_term
+        grad_log_prob_proposal = self.posterior_prob.grad_log_posterior(theta_proposal)
+        mean_theta_proposal = theta_proposal + 0.5 * self.sigma**2 * grad_log_prob_proposal
+        current_tran_prob = np.exp(- 0.5 * np.sum((theta_proposal - mean_theta_init)**2) / (self.sigma**2))
+        back_tran_prob = np.exp(-0.5 * np.sum((theta_init - mean_theta_proposal)**2) / (self.sigma**2))
+        accept_rate = min(
+            1, 
+            (self.posterior_prob.posterior(theta_proposal) * back_tran_prob) / (
+                self.posterior_prob.posterior(theta_init) * current_tran_prob
+            )
+        )
+        rand_u = np.random.rand()
+        if rand_u < accept_rate:
+            return theta_proposal, 1
+        return theta_init, 0
+        
+    def sample(self, theta_init, num_samples):
+        self.accept_hist = np.zeros(num_samples)
+        state_shape = theta_init.shape[0]
+        samples = np.zeros((num_samples+1, state_shape))
+        samples[0] = theta_init
+        for step in range(num_samples):
+            theta_current, accept = self.sample_one_step(samples[step])
+            samples[step+1] = theta_current
+            self.accept_hist[step] = accept
+        return samples
+```
+
+```{python HMC, echo=FALSE}
+class HamiltonianModel:
+    def __init__(self, K, V, dHdp, dHdq):
+        self.K = K
+        self.V = V
+        self.dHdq = dHdq
+        self.dHdp = dHdp
+        
+    def energy(self, p, q):
+        return self.K(p) + self.V(q)
+    
+    def dHdq(self, q):
+        return self.dHdq(q)
+    
+    def dHdp(self, p):
+        return self.dHdp(p)
+      
+class HMCSampler:
+    def __init__(self, model, epsilon=0.15, L_step=10):
+        self.model = model
+        self.epsilon = epsilon
+        self.L_step = L_step
+        
+    def leap_frog_one_step(self, q, p):
+        dHdq = self.model.dHdq(q)
+        p_half = p - 0.5 * self.epsilon * dHdq
+        dHdp = self.model.dHdp(p_half)
+        q_one = q + self.epsilon * dHdp
+        dHdq = self.model.dHdq(q_one)
+        p_one = p_half - 0.5 * self.epsilon * dHdq
+        return q_one, p_one
+    
+    def leap_frog(self, q, p, L_step = None):
+        if not L_step:
+            L_step = self.L_step
+        orig_q = q
+        orig_p = p
+        for _ in range(L_step):
+            q, p = self.leap_frog_one_step(q, p)
+        current_energy = self.model.energy(-p, q)
+        orig_energy = self.model.energy(orig_p, orig_q)
+        
+        accept_rate = min(np.exp(orig_energy - current_energy), 1)
+        if np.random.rand() < accept_rate:
+            return q, 1
+        else:
+            return orig_q, 0
+        
+    def propose_p(self):
+        return scipy.stats.multivariate_normal(mean=[0,0], cov=[[1,0], [0,1]]).rvs(size=1)
+        
+        
+    def sample(self, q_init, num_samples=1000):
+        self.accept_hist = np.zeros(num_samples)
+        state_shape = q_init.shape[0]
+        samples = np.zeros((num_samples+1, state_shape))
+        samples[0] = q_init
+        for step in range(num_samples):
+            p_init = self.propose_p()
+            q_current, accept = self.leap_frog(q=samples[step], p=p_init)
+            samples[step+1] = q_current
+            self.accept_hist[step] = accept
+        return samples
+```
+
+```{python Define samplers}
+# RWMH
+rw_proposal_dist = normal_distribution([0, 0], [[0.15**2, 0], [0, 0.15**2]])
+rwmh_sampler = SimMCMCSampler(theta_posterior, rw_proposal_dist)
+
+# MALA
+posterior = PosteriorProb(theta_posterior, grad_log_posterior)
+mala_sampler = MALASampler(posterior, sigma=0.15)
+
+# HMC
+def potential_energy(q):
+    q1, q2 = q[0], q[1]
+    return q1**2 / 2  + q2**2 / 2 + np.sum((y_samples - q1 - q2**2)**2) / ( 2 * sigma_y**2)
+
+def kinetic_energy(p):
+    p1, p2 = p[0], p[1]
+    return p1**2 / 2 + p2**2 / 2
+
+def dHdp(p):
+    return p
+
+def dHdq(q):
+    q1, q2 = q[0], q[1]
+    dHdq1 = q1 - np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    dHdq2 = q2 - 2 * q2 * np.sum(y_samples - q1 - q2**2) / (sigma_y**2)
+    return np.array([dHdq1, dHdq2])
+  
+model = HamiltonianModel(K = kinetic_energy, V = potential_energy, dHdp = dHdp, dHdq = dHdq)
+hmc_sampler = HMCSampler(model=model)
+```
+
+```{python sampling}
+start_point = np.array([-0.5, 0.0])
+rw_samples = rwmh_sampler.sample(start_point, num_samples = 100)
+mala_samples = mala_sampler.sample(start_point, num_samples = 100)
+hmc_samples = hmc_sampler.sample(start_point, num_samples = 10)
+```
+
+```{python, echo=FALSE}
+plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
+plt.plot(rw_samples[:, 0], rw_samples[:, 1], color='r', label='rwmh');
+plt.plot(mala_samples[:, 0], mala_samples[:, 1], color='b', label='mala');
+plt.plot(hmc_samples[:, 0], hmc_samples[:, 1], color='g', label='hmc');
+plt.xlabel("theta1");
+plt.ylabel("theta2");
+plt.legend();
+plt.xlim(-2, 2);
+plt.ylim(-2, 2);
+plt.show()
+```
+
+上面的采样中，HMC只采了10个样本，这是因为每次采样都进行了10次frog leap。所以10次也约等于其它两个采样算法的100步。从上面的结果中，我们可以看到:
+
+1. RWMH达到高概率区域的时间最久，探索高概率区域的范围也最小。
+2. MALA算法达到高概率区域的时间花费第二，探索高概率区域的范围也主要集中在下方。
+3. HMC算法达到高概率区域的时间花费最短，探索高概率区域的范围也很大。
+
+## 收敛速度
+下面我们来比较一下三种算法的收敛速度。为了验证是否达到收敛，通常的做法是多选取几个起始点，分别生成Markov chain，然后计算组间方差及组内方差，并计算一个统计量$\hat{R}$。如果$\hat{R}$接近1，那么就收敛了，不然就没有收敛(通常接近1的阈值选取1.1)。这个统计量的意义大致上是估计多个采样结果总和之后的分布方差和单个采样结果的分布方差的比值的平方根，具体的解释请参阅 @gelman2013bayesian
+
+下面我们写一个函数来计算这个统计量
+```{python}
+def compute_Rhat(sampler, init_points, num_samples):
+    m = len(init_points) # number of chains
+    n = num_samples
+    samples = [sampler.sample(init_point, num_samples) for init_point in init_points]
+  
+    total_sample_dfs = pd.concat([pd.DataFrame({'sample_ind': ind, 'theta1': sample[:, 0], 'theta2': sample[:, 1], 'insample_ind': np.arange(n+1)}) for ind, sample in enumerate(samples)])
+  
+    total_sample_dfs_sub = total_sample_dfs.loc[total_sample_dfs.insample_ind >= (n/2)]
+    in_sample_mean = total_sample_dfs_sub.groupby('sample_ind')[['theta1', 'theta2']].mean()
+    total_sample_mean = total_sample_dfs_sub[['theta1', 'theta2']].mean()
+    
+    n = int(n / 2)
+    B = n / (m - 1) * np.sum((in_sample_mean - total_sample_mean)**2, axis=0)
+    
+    in_sample_var = total_sample_dfs_sub.groupby('sample_ind')[['theta1', 'theta2']].var()
+    
+    W = in_sample_var.mean(axis=0)
+    
+    varPsi =  (n-1) /n * W + B / n
+    return np.sqrt(varPsi / W), total_sample_dfs
+```
+
+那么我们可以看一下相同情况下不同MCMC方法的$\hat{R}$是怎么样的
+```{python}
+init_points = [np.array([-0.5, 0.0]), np.array([-0.5, 1.5]), np.array([-0.5, -1.5]),
+              np.array([0.0, 0.0]), np.array([0.0, 1.5]), np.array([0.0, -1.5]),
+              np.array([-2, 0.0]), np.array([-2, 1.5]), np.array([-2, -1.5])]
+              
+np.random.seed(1234)
+Rhat_rwmh, rwmh_samples = compute_Rhat(rwmh_sampler, init_points, 2000)
+Rhat_mala, mala_samples = compute_Rhat(mala_sampler, init_points, 2000)
+Rhat_hmc, hmc_samples = compute_Rhat(hmc_sampler, init_points, 200)
+
+print(f"Rhat of rwmh: {Rhat_rwmh}")
+print(f"Rhat of mala: {Rhat_mala}")
+print(f"Rhat of hmc: {Rhat_hmc}")
+```
+从上面的结果可以看出，对于$\theta_1$来说，三种采样方法基本都达到了收敛。而对于$\theta_2$来说，只有HMC采样方法收敛。
+
+# Conclusion
+本文比较了一下前面介绍的三种MCMC采样方法，从到达高概率区域的速度和收敛速度方面进行了初步的比较。在香蕉型分布的例子上，HMC在收敛速度上是有优势的。
+
+本文也是介绍Monte Carlo方法系列文章的最后一篇。在这个系列里，对于这些算法所做的介绍都是关注于最基本的形式，有很多改进的方法都没有涉及。这么做的目的主要是想给大家一个直观的解释，同时希望能通过简单的代码，展示一下算法的基本实现方法。下面对于几个算法再做点简单的评论
+
+1. 对于MCMC类型的算法来说，每一次提出的新的样本都有一定的概率被介绍。但是并不是这个接受的概率越高越好。因为如果每一次提出的新样本很之前的样本十分接近，那么接受概率自然就高，但是这样在参数空间里探索的速度就会很慢，同样需要很久才能达到收敛。通常来说，采样的平均接受概率在60%-70%之间比较合适。
+2. 之前介绍的RWMH和MALA算法里，每一次的转移概率的方差（也可以认为是步长）都是固定的，那么有没有可能采用自适应（self-adaptive）的步长呢？感兴趣的读者可以自己去思考一下这个问题。
+3. 对于HMC里的动能项$T$，我们同样采取了常数的质量。那么和上面一点同样的，我们也可以思考如何采样自适应的质量来提高采样效率。
+
+本系列文章后面采用了`python`语言，这是因为我想利用面向对象编程的封装，不要传递太多参数，让代码看起来简洁一点。而我又不会`R`的面向对象编程，所以只好换成了`python`语言。但是我想这两种语言的语法都不难，读起来应该是没有障碍的。还请大家原谅。
+
+# References

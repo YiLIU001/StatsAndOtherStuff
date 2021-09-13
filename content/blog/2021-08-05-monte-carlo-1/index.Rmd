@@ -33,6 +33,7 @@ $$\frac{1}{N} \sum_{i=1}^N h(\theta_i) \rightarrow \int_\mathcal{\Theta} h(\thet
 * [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
 * [Metroplis Adaptive Langevin Algorithm](/blog/monte-carlo-3)
 * [Hamiltonian Monte Carlo](/blog/monte-carlo-4)
+* [Comparison of MCMC](/blog/monte-carlo-5)
 
 
 # Importance sampling

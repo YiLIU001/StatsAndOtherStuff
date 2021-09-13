@@ -22,6 +22,7 @@ link-citations: true
 * [Importance sampling](/blog/monte-carlo-1)
 * [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
 * [Metroplis Adaptive Langevin Algorithm](/blog/monte-carlo-3)
+* [Comparison of MCMC](/blog/monte-carlo-5)
 
 # Introduction
 

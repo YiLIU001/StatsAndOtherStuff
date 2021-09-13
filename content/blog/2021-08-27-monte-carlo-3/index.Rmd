@@ -23,6 +23,7 @@ link-citations: true
 * [Importance sampling](/blog/monte-carlo-1)
 * [Random walk Markov chain Monte Carlo](/blog/monte-carlo-2)
 * [Hamiltonian Monte Carlo](/blog/monte-carlo-4)
+* [Comparison of MCMC](/blog/monte-carlo-5)
 
 
 # Introduction

@@ -39,6 +39,7 @@ link-citations: true
 <li><a href="/blog/monte-carlo-1">Importance sampling</a></li>
 <li><a href="/blog/monte-carlo-3">Metroplis Adaptive Langevin Algorithm</a></li>
 <li><a href="/blog/monte-carlo-4">Hamiltonian Monte Carlo</a></li>
+<li><a href="/blog/monte-carlo-5">Comparison of MCMC</a></li>
 </ul>
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
@@ -127,7 +128,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f83aa7f2550&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f95957a25c0&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:
