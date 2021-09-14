@@ -166,17 +166,20 @@ print(f&quot;Rhat of rwmh: {Rhat_rwmh}&quot;)</code></pre>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>
 <p>本文比较了一下前面介绍的三种MCMC采样方法，从到达高概率区域的速度和收敛速度方面进行了初步的比较。在香蕉型分布的例子上，HMC在收敛速度上是有优势的。</p>
-<p>本文也是介绍Monte Carlo方法系列文章的最后一篇。在这个系列里，对于这些算法所做的介绍都是关注于最基本的形式，有很多改进的方法都没有涉及。这么做的目的主要是想给大家一个直观的解释，同时希望能通过简单的代码，展示一下算法的基本实现方法。下面对于几个算法再做点简单的评论</p>
+<p>本文也是介绍Monte Carlo方法系列文章的最后一篇。在这个系列里，对于这些算法所做的介绍都是关注于最基本的形式，有很多改进的方法都没有涉及。这么做的目的主要是想给大家一个直观的解释，同时希望能通过简单的代码，展示一下算法的基本实现方法。下面提出几个额外的点供大家思考一下</p>
 <ol style="list-style-type: decimal">
 <li>对于MCMC类型的算法来说，每一次提出的新的样本都有一定的概率被介绍。但是并不是这个接受的概率越高越好。因为如果每一次提出的新样本很之前的样本十分接近，那么接受概率自然就高，但是这样在参数空间里探索的速度就会很慢，同样需要很久才能达到收敛。通常来说，采样的平均接受概率在60%-70%之间比较合适。</li>
 <li>之前介绍的RWMH和MALA算法里，每一次的转移概率的方差（也可以认为是步长）都是固定的，那么有没有可能采用自适应（self-adaptive）的步长呢？感兴趣的读者可以自己去思考一下这个问题。</li>
-<li>对于HMC里的动能项<span class="math inline">\(T\)</span>，我们同样采取了常数的质量。那么和上面一点同样的，我们也可以思考如何采样自适应的质量来提高采样效率。</li>
+<li>对于HMC里的动能项<span class="math inline">\(T\)</span>，我们同样采取了常数的质量。那么和上面一点同样的，我们也可以思考如何采样自适应的质量来提高采样效率。对于HMC来说，还有几个超参（hyper-parameter）需要调整，比如每次蛙跳步的步长<span class="math inline">\(\epsilon\)</span>和每次在能量空间蛙跳的步数<span class="math inline">\(L\)</span>。这些参数的选择也很影响采样算法的效率。进一步的内容可以参阅 <span class="citation"><a href="#ref-ConceptHMC" role="doc-biblioref">Betancourt</a> (<a href="#ref-ConceptHMC" role="doc-biblioref">2017</a>)</span></li>
 </ol>
 <p>本系列文章后面采用了<code>python</code>语言，这是因为我想利用面向对象编程的封装，不要传递太多参数，让代码看起来简洁一点。而我又不会<code>R</code>的面向对象编程，所以只好换成了<code>python</code>语言。但是我想这两种语言的语法都不难，读起来应该是没有障碍的。还请大家原谅。</p>
 </div>
 <div id="references" class="section level1 unnumbered">
 <h1>References</h1>
 <div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-ConceptHMC" class="csl-entry">
+Betancourt, Michael. 2017. <span>“A Conceptual Introduction to Hamiltonian Monte Carlo.”</span> <em>arXiv Preprint arXiv:1701.02434</em>.
+</div>
 <div id="ref-gelman2013bayesian" class="csl-entry">
 Gelman, A., J. B. Carlin, H. S. Stern, D. B. Dunson, A. Vehtari, and D. B. Rubin. 2013. <em>Bayesian Data Analysis, Third Edition</em>. Chapman &amp; Hall/CRC Texts in Statistical Science. Taylor &amp; Francis.
 </div>
