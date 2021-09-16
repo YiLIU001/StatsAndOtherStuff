@@ -183,12 +183,12 @@ class SimMCMCSampler:
             return proposal_state, 1
         return current_state, 0
     
-    def run_mc(self, start_state: np.array, num_steps=1000):
+    def sample(self, start_state: np.array, num_samples=1000):
         state_shape = start_state.shape[0]
-        samples = np.zeros((num_steps+1, state_shape))
+        samples = np.zeros((num_samples+1, state_shape))
         samples[0] = start_state
-        self.proposal_acceptance = np.zeros(num_steps)
-        for step in range(num_steps):
+        self.proposal_acceptance = np.zeros(num_samples)
+        for step in range(num_samples):
             next_state, accept = self.one_step_mc(samples[step])
             samples[step+1] = next_state
             self.step += 1
@@ -200,7 +200,7 @@ MCMC的主要算法就在上面的`one_step_mc`函数里了。下面我们来进
 ```{python}
 medium_proposal_dist = normal_distribution([0, 0], [[0.15**2, 0], [0, 0.15**2]])
 medium_sampler = SimMCMCSampler(theta_posterior, medium_proposal_dist)
-medium_samples = medium_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+medium_samples = medium_sampler.sample(np.array([-0.5, 1.5]), 10000)
 
 plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
 plt.plot(medium_samples[:, 0], medium_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
@@ -213,7 +213,7 @@ plt.show()
 ```{python}
 small_proposal_dist = normal_distribution([0, 0], [[0.01**2, 0], [0, 0.01**2]])
 small_sampler = SimMCMCSampler(theta_posterior, small_proposal_dist)
-small_samples = small_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+small_samples = small_sampler.sample(np.array([-0.5, 1.5]), 10000)
 
 plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
 plt.plot(small_samples[:, 0], small_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);
@@ -227,7 +227,7 @@ plt.show()
 ```{python}
 large_proposal_dist = normal_distribution([0, 0], [[0.5**2, 0], [0, 0.5**2]])
 large_sampler = SimMCMCSampler(theta_posterior, large_proposal_dist)
-large_samples = large_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+large_samples = large_sampler.sample(np.array([-0.5, 1.5]), 10000)
 
 plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap="Blues");
 plt.plot(large_samples[:, 0], large_samples[:, 1], 'o', color="orange", alpha=0.1, markersize=2);

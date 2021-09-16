@@ -128,7 +128,7 @@ plt.show()</code></pre>
 <p>我们再为后面方便定义一个函数</p>
 <pre class="python"><code>theta_posterior = partial(unnormalized_posterior, y=y_samples, sigma_y=sigma_y)</code></pre>
 <p>我们可以画出后验概率的分布</p>
-<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7f95957a25c0&gt;</code></pre>
+<pre><code>## &lt;matplotlib.contour.QuadContourSet object at 0x7fee83b1e588&gt;</code></pre>
 <p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
 <p>我们再定义一个正太分布的类，以便后面使用。</p>
 <pre class="python"><code>class normal_distribution:
@@ -157,12 +157,12 @@ plt.show()</code></pre>
             return proposal_state, 1
         return current_state, 0
     
-    def run_mc(self, start_state: np.array, num_steps=1000):
+    def sample(self, start_state: np.array, num_samples=1000):
         state_shape = start_state.shape[0]
-        samples = np.zeros((num_steps+1, state_shape))
+        samples = np.zeros((num_samples+1, state_shape))
         samples[0] = start_state
-        self.proposal_acceptance = np.zeros(num_steps)
-        for step in range(num_steps):
+        self.proposal_acceptance = np.zeros(num_samples)
+        for step in range(num_samples):
             next_state, accept = self.one_step_mc(samples[step])
             samples[step+1] = next_state
             self.step += 1
@@ -172,7 +172,7 @@ plt.show()</code></pre>
 <p>MCMC的主要算法就在上面的<code>one_step_mc</code>函数里了。下面我们来进行模拟采样。首先，我们采用一个均值为0，方差为<code>0.15**2</code>的高斯分布作为proposal distribtuion</p>
 <pre class="python"><code>medium_proposal_dist = normal_distribution([0, 0], [[0.15**2, 0], [0, 0.15**2]])
 medium_sampler = SimMCMCSampler(theta_posterior, medium_proposal_dist)
-medium_samples = medium_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+medium_samples = medium_sampler.sample(np.array([-0.5, 1.5]), 10000)
 
 plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap=&quot;Blues&quot;);
 plt.plot(medium_samples[:, 0], medium_samples[:, 1], &#39;o&#39;, color=&quot;orange&quot;, alpha=0.1, markersize=2);
@@ -183,7 +183,7 @@ plt.show()</code></pre>
 <p>从上面的采样结果来看，经过10000步的采样，基本得到了比较符合后验概率的结果。下面我们看看不同的proposal distribution会对采样结果有什么影响。先看一个方差较小的高斯分布的采样效果</p>
 <pre class="python"><code>small_proposal_dist = normal_distribution([0, 0], [[0.01**2, 0], [0, 0.01**2]])
 small_sampler = SimMCMCSampler(theta_posterior, small_proposal_dist)
-small_samples = small_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+small_samples = small_sampler.sample(np.array([-0.5, 1.5]), 10000)
 
 plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap=&quot;Blues&quot;);
 plt.plot(small_samples[:, 0], small_samples[:, 1], &#39;o&#39;, color=&quot;orange&quot;, alpha=0.1, markersize=2);
@@ -195,7 +195,7 @@ plt.show()</code></pre>
 <p>然后是方差较大的高斯分布的采样结果</p>
 <pre class="python"><code>large_proposal_dist = normal_distribution([0, 0], [[0.5**2, 0], [0, 0.5**2]])
 large_sampler = SimMCMCSampler(theta_posterior, large_proposal_dist)
-large_samples = large_sampler.run_mc(np.array([-0.5, 1.5]), 10000)
+large_samples = large_sampler.sample(np.array([-0.5, 1.5]), 10000)
 
 plt.contourf(theta1_2d, theta2_2d, posterior_2d, levels=100, cmap=&quot;Blues&quot;);
 plt.plot(large_samples[:, 0], large_samples[:, 1], &#39;o&#39;, color=&quot;orange&quot;, alpha=0.1, markersize=2);
