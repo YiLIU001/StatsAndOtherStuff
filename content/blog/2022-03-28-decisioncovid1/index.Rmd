@@ -1,0 +1,53 @@
+---
+title: Decision theory for covid test
+author: Yi LIU
+date: '2022-03-28'
+slug: DecisionCovid1
+categories:
+  - Work
+tags:
+  - Stats
+output:
+  blogdown::html_page:
+    toc: true
+    toc_depth: 2
+bibliography: [../Refs.bib]
+biblio-style: "apalike"
+link-citation: true
+---
+
+# Introduction
+
+这两年来的covid疫情，影响了几乎所有人的生活。目前上海的疫情看起来十分严重，希望能够很快平息下去，我们又能过上正常的生活。
+
+进来我们国家也开始有了对于covid的抗体（antigen, AG）检测，那么和之前的核酸（nucleic acid, NA）检测比较，那种收益更大，或者损失更小呢？本文就从一个及其粗浅的近似开始，利用决策理论（Decision Theory）来进行一些初步的分析。
+
+## 二分类问题的评估标准
+
+Covid检测是一个二分类问题。通常对于二分类检测方法的评估会用到四格表
+
+| | True | False |
+|---|---|---|
+|Pos | TP | FP |
+| Neg | FN | TN |
+
+其中第一列的两个值表示检测结果，Pos（positive）或者Neg（negative）。第一行的两个值表示真实情况，True（患者）或者False（健康）。评估指标有很多种，比如机器学习里两个常用的是precision和recall。医学上，通常会用敏感度（sensitivity）和特异度（specificity）来评估。两者定义如下：
+
+$$sen = P(Pos | True) = \frac{TP}{TP + FN} = recall$$
+$$spec = P(Neg | False) = \frac{TN}{TN + FP}$$
+从定义可以看出，敏感度是患者被检测出阳性的概率，而特异度是健康人群被检测出阴性的概率。对于抗体检测和核酸检测，一般来说核酸检测的敏感度和特异度都会比较高，即
+
+$$sen_{NA} > sen_{AG}$$
+$$spec_{NA} > spec_{AG}$$
+其中，下标$NA$表示核酸检测，下标$AG$表示抗原检测。那么既然两个指标下都是核酸检测优于抗原检测，为什么还要提出抗原检测，直接用核酸检测就好了呀？这个有两方面的原因，一个是核酸检测成本较高（本文暂不考虑这个因素），另一个是核酸检测的capacity跟不上。后面我们会从决策理论出发，进行一些探讨。
+
+## 损失函数
+
+有了检测方法的二分类评估指标之后，我们需要再来定义在不同情况下的损失函数来量化评估两种检测方法的优劣。为此，我们引入不同情况下的损失函数，
+
+$$loss(test, disease) = \left\{ \begin{aligned}
+0, \text{test=Pos and disease=True} \\ 
+l1, \text{test=Pos and disease=False}\\
+l2, \text{test=Neg and disease=True}\\
+l2, \text{test=Neg and disease=False}\\
+\end{aligned} \right.$$
