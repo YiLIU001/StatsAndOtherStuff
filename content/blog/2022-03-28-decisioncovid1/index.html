@@ -20,11 +20,14 @@ link-citation: true
 
 <div id="TOC">
 <ul>
-<li><a href="#introduction">Introduction</a>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#分析框架概念定义及假设">分析框架，概念定义及假设</a>
 <ul>
 <li><a href="#二分类问题的评估标准">二分类问题的评估标准</a></li>
 <li><a href="#损失函数">损失函数</a></li>
+<li><a href="#关于人群及检测的其它假设">关于人群及检测的其它假设</a></li>
 </ul></li>
+<li><a href="#损失计算">损失计算</a></li>
 </ul>
 </div>
 
@@ -32,6 +35,10 @@ link-citation: true
 <h1>Introduction</h1>
 <p>这两年来的covid疫情，影响了几乎所有人的生活。目前上海的疫情看起来十分严重，希望能够很快平息下去，我们又能过上正常的生活。</p>
 <p>进来我们国家也开始有了对于covid的抗体（antigen, AG）检测，那么和之前的核酸（nucleic acid, NA）检测比较，那种收益更大，或者损失更小呢？本文就从一个及其粗浅的近似开始，利用决策理论（Decision Theory）来进行一些初步的分析。</p>
+</div>
+<div id="分析框架概念定义及假设" class="section level1">
+<h1>分析框架，概念定义及假设</h1>
+<p>为了分析这个问题，我们需要先引入一些概念和假设。</p>
 <div id="二分类问题的评估标准" class="section level2">
 <h2>二分类问题的评估标准</h2>
 <p>Covid检测是一个二分类问题。通常对于二分类检测方法的评估会用到四格表</p>
@@ -57,8 +64,8 @@ link-citation: true
 </tbody>
 </table>
 <p>其中第一列的两个值表示检测结果，Pos（positive）或者Neg（negative）。第一行的两个值表示真实情况，True（患者）或者False（健康）。评估指标有很多种，比如机器学习里两个常用的是precision和recall。医学上，通常会用敏感度（sensitivity）和特异度（specificity）来评估。两者定义如下：</p>
-<p><span class="math display">\[sen = P(Pos | True) = \frac{TP}{TP + FN} = recall\]</span>
-<span class="math display">\[spec = P(Neg | False) = \frac{TN}{TN + FP}\]</span>
+<p><span class="math display">\[sen = P(test=Pos | disease=True) = \frac{TP}{TP + FN} = recall\]</span>
+<span class="math display">\[spec = P(test=Neg | disease=False) = \frac{TN}{TN + FP}\]</span>
 从定义可以看出，敏感度是患者被检测出阳性的概率，而特异度是健康人群被检测出阴性的概率。对于抗体检测和核酸检测，一般来说核酸检测的敏感度和特异度都会比较高，即</p>
 <p><span class="math display">\[sen_{NA} &gt; sen_{AG}\]</span>
 <span class="math display">\[spec_{NA} &gt; spec_{AG}\]</span>
@@ -68,10 +75,67 @@ link-citation: true
 <h2>损失函数</h2>
 <p>有了检测方法的二分类评估指标之后，我们需要再来定义在不同情况下的损失函数来量化评估两种检测方法的优劣。为此，我们引入不同情况下的损失函数，</p>
 <p><span class="math display">\[loss(test, disease) = \left\{ \begin{aligned}
-0, \text{test=Pos and disease=True} \\ 
-l1, \text{test=Pos and disease=False}\\
-l2, \text{test=Neg and disease=True}\\
-l2, \text{test=Neg and disease=False}\\
+0, \text{ test=Pos and disease=True} \\ 
+l_1, \text{ test=Pos and disease=False}\\
+l_2, \text{ test=Neg and disease=True}\\
+0, \text{ test=Neg and disease=False}\\
 \end{aligned} \right.\]</span></p>
+<p>这里我们假设了检测正确不会有损失，实际情况当然不会是这样。患者被检测出阳性会有后续治疗成本，但是目前我们先做一个粗糙的近似。根据常识，我们假设<span class="math inline">\(l_1 \ll l_2\)</span>。</p>
+<p>此外，我们还需要不检测情况下的损失函数。一个初步的近似是阳性的损失和阳性被误诊为阴性的损失一样，而阴性没有损失。</p>
+<p><span class="math display">\[loss(no-test, disease) = \left\{ \begin{aligned} l_2, \text{ disease=True} \\ 0, \text{ disease=False} \end{aligned} \right.\]</span></p>
 </div>
+<div id="关于人群及检测的其它假设" class="section level2">
+<h2>关于人群及检测的其它假设</h2>
+<p>因为我们是考虑两种检测方法对于总体人群的收益，我们还需要做一些额外的假设。</p>
+<p>第一个假设是关于人群里的患者比例<span class="math inline">\(P_{cov}\)</span>，这个数值和接种疫苗比例有关，接种比例越高，患者比例越低。</p>
+<p>第二个假设是两种检测方法的capacity或者说检测人数占总人口比例：$cap_{NA} = N^{tested}<em>{NA}/N^{tot} <span class="math inline">\(和\)</span>cap</em>{AG} = N^{tested}<em>{AG}/N^{tot}<span class="math inline">\(。我们假设\)</span>cap</em>{NA} &lt; cap_{AG}$。</p>
+<p>第三个假设是是否生病和检测与否，检测方法以及检测结果都无关，<span class="math inline">\(P(disease=True|test)_{AG,NA} = P(disease=True|test=Positive)_{AG, NA} = P(disease) = P_{cov}\)</span></p>
+</div>
+</div>
+<div id="损失计算" class="section level1">
+<h1>损失计算</h1>
+<p>有了上面的假设和定义，我们可以计算使用两种不同检测方式的损失。下面我们先不考虑具体是哪种检测方式，计算出通用的损失表达式，然后再代入两种检测方式。</p>
+<p><span class="math display">\[
+\begin{aligned}
+ &amp; E(loss)\\
+=&amp; E(loss| \text{no-test})P(\text{no-test}) + E(loss| \text{test})_{AG}P(\text{test}) \\
+=&amp; E(loss| \text{no-test}) (1-cap) + E(loss| \text{test}) cap
+\end{aligned}
+\]</span></p>
+<p>上式中的第一项内的期望可以计算得
+<span class="math display">\[
+\begin{aligned}
+ &amp; E(loss|\text{no-test}) \\
+=&amp; loss(no-test, disease=True) P(disease=True|\text{no-test}) + loss(test, disease=False) P (disease=False | \text{no-test}) \\
+=&amp; l_2 P(disease=True|\text{no-test}) \\
+=&amp; l_2 P_{cov}
+\end{aligned}
+\]</span>
+第二项同样计算可得
+<span class="math display">\[
+\begin{aligned}
+ &amp; E(loss|\text{test}) \\
+=&amp; loss(test, disease=True) P(disease=True|\text{test})\\
+ &amp;+ loss(test, disease=False) P (disease=False | \text{test}) \\
+=&amp; loss(test=Pos, disease=True) P(test=Pos| disease=True, \text{test}) P(disease=True| \text{test}) \\
+ &amp; +loss(test=Neg, disease=True) P(test=Neg| disease=True, \text{test}) P(disease=True| \text{test}) \\ 
+ &amp; + loss(test=Pos, disease=False) P(test=Pos| disease=False, \text{test}) P(disease=False| \text{test}) \\
+ &amp; + loss(test=Neg, disease=False) P(test=Neg| disease=False, \text{test}) P(disease=False| \text{test}) \\
+=&amp; \underbrace{loss(test=Pos, disease=True)}_{0} P(test=Pos| disease=True) P(disease=True) \\
+ &amp; +loss(test=Neg, disease=True) P(test=Neg| disease=True) P(disease=True) \\ 
+ &amp; + loss(test=Pos, disease=False) P(test=Pos| disease=False) P(disease=False) \\
+ &amp; + \underbrace{loss(test=Neg, disease=False)}_{0} P(test=Neg| disease=False) P(disease=False) \\
+=&amp; l_2 (1 - P(test=Pos| disease=True)) P(disease=True) \\
+ &amp; + l_1 (1 - P(test=Neg| disease=False)) P(disease=False) \\
+=&amp; l_2(1 - sen) P_{cov} + l_1 (1-spec) (1-P_{cov})
+\end{aligned}
+\]</span>
+因此，我们有
+<span class="math display">\[
+\begin{aligned}
+&amp; E(loss)\\
+=&amp; l_2 P_{cov} (1 - cap) + l_2(1 - sen)P_{cov} cap + l_1 (1 - spec) (1 - P_{cov}) cap\\
+=&amp; 
+\end{aligned}
+\]</span></p>
 </div>
