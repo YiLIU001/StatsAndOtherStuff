@@ -29,6 +29,9 @@ markup:
   goldmark:
     renderer:
       unsafe: yes
+taxonomies:
+  category: categories
+  tag: tags
 menu:
   primary:
     - name: Home
@@ -40,6 +43,10 @@ menu:
     - name: GitHub
       url: https://github.com/YiLIU001
       weight: 3
+  shortcuts:
+    - name: <i class='fas fa-tags'></i> Tags
+      url: /tags
+      weight: 4
       
 permalinks:
   post: /blog/:year-:month-:day-:slug/
