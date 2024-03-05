@@ -26,6 +26,13 @@ description: Description for the page
 
 这次旅程是2024年3月2日到3日发生的。路途当中有几张照片显示了当时路途的特点
 
-![descend1](Descend1.png){ width=100px }
+<div class="figure">
+<img src="Descend1.png" alt="下山图片1" width="50%" />
+<p class="caption">Figure 1: 下山图片1</p>
+</div>
 
-![descend2](Descend2.png){ width=100px }
+<div class="figure">
+<img src="Descend2.png" alt="下山图片2" width="50%" />
+<p class="caption">Figure 2: 下山图片2</p>
+</div>
+
