@@ -26,6 +26,6 @@ description: Description for the page
 
 这次旅程是2024年3月2日到3日发生的。路途当中有几张照片显示了当时路途的特点
 
-![descend1](Descend1.png){ width=20% }
+![descend1](Descend1.png){ width=100px }
 
-![descend2](Descend2.png){ width=20% }
+![descend2](Descend2.png){ width=100px }
